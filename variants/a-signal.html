@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ДАНО / варіант A «Сигнал»</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ink:#0b0c0e;
+  --ink-2:#121417;
+  --line:#22262b;
+  --paper:#e8e9ea;
+  --dim:#8d949c;
+  --accent:#f2b02e;
+  --sans:"IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--ink);color:var(--paper);font-family:var(--sans);-webkit-font-smoothing:antialiased;line-height:1.5}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+
+/* nav */
+.nav{position:sticky;top:0;z-index:20;height:68px;display:flex;align-items:center;gap:28px;
+  background:rgba(11,12,14,.82);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:.02em}
+.brand svg{width:22px;height:22px}
+.nav-links{display:flex;gap:26px;margin-left:auto;font-size:14.5px;color:var(--dim)}
+.nav-links a:hover{color:var(--paper)}
+.nav .btn{margin-left:26px}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 20px;border-radius:var(--r);
+  font-size:14.5px;font-weight:600;transition:transform .18s ease,background .18s ease,border-color .18s ease}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:var(--accent);color:#191305}
+.btn-primary:hover{background:#ffc352}
+.btn-ghost{border:1px solid var(--line);color:var(--paper)}
+.btn-ghost:hover{border-color:#3a4048}
+
+/* hero */
+.hero{padding:88px 0 72px;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+h1{font-size:clamp(38px,5.4vw,64px);line-height:1.06;letter-spacing:-.03em;font-weight:600}
+h1 b{color:var(--accent);font-weight:600}
+.lede{margin-top:22px;max-width:44ch;font-size:17.5px;color:#b7bcc2}
+.hero-cta{margin-top:32px;display:flex;gap:12px;flex-wrap:wrap}
+.sources{margin-top:34px;display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:12.5px;color:var(--dim);letter-spacing:.04em}
+.sources span{padding:5px 10px;border:1px solid var(--line);border-radius:8px}
+
+/* code card */
+.code{background:var(--ink-2);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.code-top{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:12.5px;color:var(--dim)}
+.copy{border:1px solid var(--line);background:transparent;color:var(--paper);font:inherit;font-size:12.5px;
+  padding:5px 11px;border-radius:8px;cursor:pointer;transition:border-color .18s ease}
+.copy:hover{border-color:#454c55}
+.code pre{padding:18px 16px;font-family:var(--mono);font-size:13px;line-height:1.75;overflow-x:auto;color:#cfd4d9}
+.code .k{color:var(--accent)}
+.code .s{color:#8fd6a4}
+
+/* generic section */
+section{padding:84px 0;border-top:1px solid var(--line)}
+h2{font-size:clamp(26px,3.2vw,38px);line-height:1.15;letter-spacing:-.02em;font-weight:600;max-width:20ch}
+.sub{margin-top:14px;max-width:62ch;color:#a8aeb5;font-size:16.5px}
+
+/* gap section: 2 cols asymmetric */
+.gap-grid{margin-top:46px;display:grid;grid-template-columns:2fr 1fr;gap:0;border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.gap-cell{padding:28px}
+.gap-cell + .gap-cell{border-left:1px solid var(--line)}
+.gap-list{display:grid;gap:20px}
+.gap-list p{color:#a8aeb5;font-size:15.5px;max-width:52ch}
+.gap-list strong{display:block;color:var(--paper);font-weight:600;font-size:16px;margin-bottom:4px}
+.gap-right{background:var(--ink-2);display:flex;flex-direction:column;justify-content:center;gap:16px}
+.gap-right p{font-size:16px;color:#a8aeb5}
+.gap-right .big{font-family:var(--mono);font-size:15px;color:var(--accent);letter-spacing:.02em}
+
+/* mcp: horizontal steps, no numbering labels */
+.steps{margin-top:46px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.step{background:var(--ink);padding:26px}
+.step h3{font-size:17px;font-weight:600;margin-bottom:8px}
+.step p{font-size:15px;color:#a8aeb5}
+.step-mono{font-family:var(--mono);font-size:12.5px;color:var(--accent);margin-bottom:14px;display:block}
+
+/* questions: horizontal scroll snap */
+.q-scroll{margin-top:44px;display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:14px}
+.q{scroll-snap-align:start;flex:0 0 340px;background:var(--ink-2);border:1px solid var(--line);border-radius:18px;padding:24px}
+.q .who{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+.q p{font-size:16.5px;line-height:1.55}
+
+/* stats */
+.stats{margin-top:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:32px}
+.stat .n{font-family:var(--mono);font-size:clamp(30px,4vw,46px);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .l{margin-top:6px;color:var(--dim);font-size:14.5px;max-width:22ch}
+
+/* honesty */
+.honest{margin-top:44px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.honest div{border:1px solid var(--line);border-radius:var(--r);padding:22px;font-size:16px;color:#b7bcc2}
+.honest div b{color:var(--paper);font-weight:600}
+
+/* footer */
+footer{border-top:1px solid var(--line);padding:56px 0 44px;background:var(--ink-2)}
+.foot-cta{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;padding-bottom:34px;border-bottom:1px solid var(--line)}
+.foot-cta h2{max-width:16ch}
+.credit{padding-top:26px;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;color:var(--dim);font-size:14px}
+.credit p{max-width:52ch}
+
+@media (max-width:900px){
+  .hero{grid-template-columns:1fr;padding:56px 0 48px;gap:36px}
+  .gap-grid,.steps,.honest{grid-template-columns:1fr}
+  .gap-cell + .gap-cell{border-left:0;border-top:1px solid var(--line)}
+  .stats{grid-template-columns:1fr 1fr;gap:26px}
+  .nav-links{display:none}
+  section{padding:56px 0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap" style="display:flex;align-items:center;width:100%">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="3" r="1.7"/><circle cx="7" cy="8" r="1.7"/><circle cx="12" cy="8" r="1.7"/><circle cx="17" cy="8" r="1.7"/><circle cx="2.5" cy="13" r="1.7"/><circle cx="7" cy="13" r="1.7"/><circle cx="12" cy="13" r="2.4"/><circle cx="17" cy="13" r="1.7"/><circle cx="21.5" cy="13" r="1.7"/><circle cx="7" cy="18" r="1.7"/><circle cx="12" cy="18" r="1.7"/><circle cx="17" cy="18" r="1.7"/></svg>
+      ДАНО
+    </div>
+    <nav class="nav-links">
+      <a href="#gap">Навіщо</a>
+      <a href="#mcp">Як працює</a>
+      <a href="#q">Приклади</a>
+      <a href="#limits">Межі</a>
+    </nav>
+    <a class="btn btn-primary" href="#mcp">Підключити</a>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <div>
+      <h1>Державні дані, доступні <b>розмовою</b></h1>
+      <p class="lede">Два MCP-сервери під'єднують Prozorro і НАЗК до вашого ШІ-асистента. П'ять рядків у налаштуваннях, далі просто питайте звичайними словами.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#mcp">Підключити</a>
+        <a class="btn btn-ghost" href="#q">Приклади запитів</a>
+      </div>
+      <div class="sources">
+        <span>Prozorro</span><span>НАЗК</span><span>ЄДР</span>
+      </div>
+    </div>
+
+    <div class="code">
+      <div class="code-top">
+        <span>claude_desktop_config.json</span>
+        <button class="copy" data-copy>Копіювати</button>
+      </div>
+<pre><code>{
+  <span class="k">"mcpServers"</span>: {
+    <span class="k">"dano-prozorro"</span>: {
+      <span class="k">"command"</span>: <span class="s">"npx"</span>,
+      <span class="k">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"@dano/prozorro"</span>]
+    },
+    <span class="k">"dano-nazk"</span>: {
+      <span class="k">"command"</span>: <span class="s">"npx"</span>,
+      <span class="k">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"@dano/nazk"</span>]
+    }
+  }
+}</code></pre>
+    </div>
+  </div>
+
+  <section id="gap">
+    <div class="wrap">
+      <h2>Дані відкриті. Інструмент аналізу є. Між ними прірва.</h2>
+      <p class="sub">Держава публікує все: закупівлі, декларації, реєстр юросіб. Але користується цим вузьке коло людей, і не тому що дані закриті.</p>
+
+      <div class="gap-grid">
+        <div class="gap-cell">
+          <div class="gap-list">
+            <p><strong>Сайти мають фіксовані фільтри</strong>Поставити можна лише те запитання, яке заздалегідь передбачив розробник сайту.</p>
+            <p><strong>Складніше запитання потребує програміста</strong>«Порівняй це з тим за три роки» вже означає окрему вигрузку і людину, яка її напише.</p>
+            <p><strong>Сирі дані незручні</strong>Тисячі сторінок JSON, коди замість назв, реєстри між собою не пов'язані.</p>
+          </div>
+        </div>
+        <div class="gap-cell gap-right">
+          <p class="big">Дані є. ШІ вміє рахувати.</p>
+          <p>Але асистент до цих реєстрів просто не дотягується. У нього немає доступу. ДАНО закриває саме цей розрив, більше нічого.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="mcp">
+    <div class="wrap">
+      <h2>MCP це як USB-роз'єм для ШІ</h2>
+      <p class="sub">Стандарт, який дозволяє під'єднати до асистента зовнішнє джерело даних. Далі він користується ним сам: шукає, бере потрібне, рахує.</p>
+
+      <div class="steps">
+        <div class="step">
+          <span class="step-mono">install</span>
+          <h3>Вставити конфіг</h3>
+          <p>П'ять рядків у налаштування вашого асистента. Без ключів API, без реєстрації.</p>
+        </div>
+        <div class="step">
+          <span class="step-mono">index</span>
+          <h3>Локальний індекс</h3>
+          <p>Кеш тримає повний зріз закупівель, тому відповідь приходить швидко, а не через годину.</p>
+        </div>
+        <div class="step">
+          <span class="step-mono">ask</span>
+          <h3>Питати словами</h3>
+          <p>Асистент отримує компактну вижимку, повні документи підтягує лише тоді, коли вони справді потрібні.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="q">
+    <div class="wrap">
+      <h2>Запитання, які вже неможливо поставити сайту</h2>
+      <p class="sub">Далі ШІ не просто відповідає текстом. Він будує таблиці, графіки, графи зв'язків, готує звіт і зберігає файл.</p>
+    </div>
+    <div class="wrap">
+      <div class="q-scroll">
+        <div class="q"><div class="who">Підприємець</div><p>«Хто в моїй області закуповував будматеріали за останній рік і за якими цінами?»</p></div>
+        <div class="q"><div class="who">Посадовець громади</div><p>«Скільки сусідні громади платили за такий самий ремонт дороги? Ми не переплачуємо?»</p></div>
+        <div class="q"><div class="who">Журналіст</div><p>«Покажи всі закупівлі цього управління за три роки і побудуй графік зміни цін.»</p></div>
+        <div class="q"><div class="who">Депутат ради</div><p>«Хто найчастіше виграє тендери нашого міськради і з яким відсотком перемог?»</p></div>
+        <div class="q"><div class="who">Дослідник</div><p>«Збери дані по закупівлях медикаментів по всіх областях у порівняльну таблицю.»</p></div>
+        <div class="q"><div class="who">Аудитор</div><p>«Перевір, чи не пов'язані між собою учасники цього тендера.»</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="stats">
+        <div class="stat"><div class="n">15M+</div><div class="l">закупівель у локальному індексі</div></div>
+        <div class="stat"><div class="n">2015</div><div class="l">рік, з якого доступні дані</div></div>
+        <div class="stat"><div class="n">2</div><div class="l">MCP-сервери: Prozorro і НАЗК</div></div>
+        <div class="stat"><div class="n">0 ₴</div><div class="l">вартість, без реєстрації</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="limits">
+    <div class="wrap">
+      <h2>Чого ДАНО не робить</h2>
+      <p class="sub">Це важливо проговорити, щоб не створювати хибних очікувань.</p>
+      <div class="honest">
+        <div><b>Не робимо власний ШІ.</b> Ви під'єднуєте той, яким уже користуєтесь.</div>
+        <div><b>Не збираємо даних про людей</b> понад те, що держава вже опублікувала сама.</div>
+        <div><b>Не виносимо звинувачень.</b> Інструмент показує факти і ознаки, що потребують уваги. Висновок робить людина.</div>
+        <div><b>Не ухвалюємо рішень</b> за тендерні комітети і не маємо на це повноважень.</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-cta">
+      <h2>П'ять рядків, і ваш асистент бачить державні реєстри</h2>
+      <a class="btn btn-primary" href="#mcp">Підключити</a>
+    </div>
+    <div class="credit">
+      <p>Департамент цифрового розвитку, інформаційної політики та кіберзахисту Одеської обласної державної адміністрації</p>
+      <p>Відкриті дані. Відкритий код.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll("[data-copy]").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    var code = btn.closest(".code").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(function(){
+      var t = btn.textContent; btn.textContent = "Скопійовано";
+      setTimeout(function(){ btn.textContent = t; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>

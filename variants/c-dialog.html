@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ДАНО / варіант C «Діалог»</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --bg:#0d1013;
+  --bg-2:#141a1f;
+  --line:#232c34;
+  --fg:#eef2f4;
+  --dim:#93a0aa;
+  --accent:#4ade9b;
+  --sans:"Onest",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1200px;margin:0 auto;padding:0 26px}
+
+.nav{position:sticky;top:0;z-index:20;height:70px;display:flex;align-items:center;background:rgba(13,16,19,.85);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;width:100%;gap:28px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:18px;letter-spacing:-.01em}
+.brand svg{width:21px;height:21px;color:var(--accent)}
+.nav-links{margin-left:auto;display:flex;gap:26px;font-size:15px;color:var(--dim)}
+.nav-links a:hover{color:var(--fg)}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:46px;padding:0 22px;border-radius:999px;font-size:15px;font-weight:600;
+  transition:transform .16s ease,background .16s ease,border-color .16s ease}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--accent);color:#062616}
+.btn-primary:hover{background:#69eeb0}
+.btn-ghost{border:1px solid var(--line);color:var(--fg)}
+.btn-ghost:hover{border-color:#38444e}
+
+/* hero */
+.hero{padding:80px 0 70px;display:grid;grid-template-columns:.95fr 1.05fr;gap:60px;align-items:center}
+h1{font-size:clamp(38px,5.6vw,66px);line-height:1.04;letter-spacing:-.035em;font-weight:600;max-width:13ch}
+.lede{margin-top:22px;max-width:44ch;font-size:17.5px;color:var(--dim)}
+.hero-cta{margin-top:32px;display:flex;gap:12px;flex-wrap:wrap}
+
+/* transcript: plain typographic exchange, not a fake app window */
+.talk{border-left:2px solid var(--accent);padding-left:26px;display:grid;gap:22px}
+.talk .ask{font-size:clamp(20px,2.3vw,26px);line-height:1.35;letter-spacing:-.015em}
+.talk .who{font-family:var(--mono);font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;display:block}
+.answer{background:var(--bg-2);border:1px solid var(--line);border-radius:16px;padding:20px 22px}
+.answer table{width:100%;border-collapse:collapse;font-size:14.5px}
+.answer th{text-align:left;font-family:var(--mono);font-weight:500;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);padding-bottom:10px}
+.answer td{padding:9px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.answer td:last-child,.answer th:last-child{text-align:right}
+.answer .note{margin-top:14px;font-size:14px;color:var(--dim)}
+.answer .up{color:var(--accent)}
+
+section{padding:88px 0;border-top:1px solid var(--line)}
+h2{font-size:clamp(27px,3.5vw,42px);line-height:1.12;letter-spacing:-.03em;font-weight:600;max-width:19ch}
+.sub{margin-top:16px;max-width:60ch;color:var(--dim);font-size:17px}
+
+/* comparison: two columns, one muted one accent-lined */
+.compare{margin-top:50px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.card{border:1px solid var(--line);border-radius:18px;padding:30px}
+.card.now{background:transparent}
+.card.next{background:var(--bg-2);border-color:#2c4a3d}
+.card h3{font-size:19px;font-weight:600;margin-bottom:18px}
+.card ul{list-style:none;display:grid;gap:14px}
+.card li{font-size:16px;color:var(--dim);padding-left:22px;position:relative}
+.card li::before{content:"";position:absolute;left:0;top:9px;width:10px;height:1.5px;background:#3d4954}
+.card.next li::before{background:var(--accent)}
+.card.next li{color:#cfd8dd}
+
+/* steps: vertical rhythm, no numbering */
+.flow{margin-top:50px;display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
+.flow div{border-top:1px solid var(--line);padding-top:20px}
+.flow h3{font-size:18px;font-weight:600;margin-bottom:8px}
+.flow p{color:var(--dim);font-size:15.5px}
+.code{margin-top:36px;background:var(--bg-2);border:1px solid var(--line);border-radius:18px;overflow:hidden;max-width:640px}
+.code-top{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12.5px;color:var(--dim)}
+.copy{font:inherit;font-size:12.5px;padding:6px 12px;border:1px solid var(--line);background:transparent;color:var(--fg);border-radius:999px;cursor:pointer}
+.copy:hover{border-color:#3d4954}
+.code pre{padding:18px 16px;font-family:var(--mono);font-size:13px;line-height:1.8;overflow-x:auto;color:#c9d3d9}
+.code .k{color:var(--accent)}
+.code .s{color:#e2c58a}
+
+/* roles marquee */
+.marquee{margin-top:46px;overflow:hidden;mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.marquee-track{display:flex;gap:14px;width:max-content;animation:slide 34s linear infinite}
+.marquee:hover .marquee-track{animation-play-state:paused}
+.chip{border:1px solid var(--line);border-radius:999px;padding:10px 20px;font-size:15px;color:var(--dim);white-space:nowrap}
+@keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* questions list as two columns of quotes */
+.qgrid{margin-top:46px;display:grid;grid-template-columns:1fr 1fr;gap:34px 48px}
+.qq{border-top:1px solid var(--line);padding-top:18px}
+.qq p{font-size:18px;line-height:1.45;letter-spacing:-.01em}
+.qq span{display:block;margin-top:10px;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:34px}
+.stat .n{font-size:clamp(32px,4.2vw,48px);font-weight:600;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+.stat .l{margin-top:6px;color:var(--dim);font-size:14.5px;max-width:22ch}
+
+/* limits */
+.limits{margin-top:44px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.limits div{border:1px solid var(--line);border-radius:16px;padding:24px}
+.limits b{display:block;font-weight:600;font-size:17px;margin-bottom:6px}
+.limits p{color:var(--dim);font-size:15.5px}
+
+footer{border-top:1px solid var(--line);background:var(--bg-2);padding:60px 0 46px}
+.foot-cta{display:flex;align-items:center;justify-content:space-between;gap:26px;flex-wrap:wrap;padding-bottom:36px;border-bottom:1px solid var(--line)}
+.foot-cta h2{max-width:17ch}
+.credit{padding-top:26px;display:flex;justify-content:space-between;gap:22px;flex-wrap:wrap;color:var(--dim);font-size:14px}
+.credit p{max-width:52ch}
+
+/* scroll reveal */
+.rv{opacity:0;transform:translateY(18px);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1)}
+.rv.in{opacity:1;transform:none}
+
+@media (max-width:940px){
+  .hero{grid-template-columns:1fr;gap:40px;padding:56px 0 48px}
+  .compare,.flow,.qgrid,.limits{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr 1fr;gap:26px}
+  .nav-links{display:none}
+  section{padding:60px 0}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+  .rv{opacity:1;transform:none}
+  .marquee-track{animation:none}
+}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="3" r="1.7"/><circle cx="7" cy="8" r="1.7"/><circle cx="12" cy="8" r="1.7"/><circle cx="17" cy="8" r="1.7"/><circle cx="2.5" cy="13" r="1.7"/><circle cx="7" cy="13" r="1.7"/><circle cx="12" cy="13" r="2.4"/><circle cx="17" cy="13" r="1.7"/><circle cx="21.5" cy="13" r="1.7"/><circle cx="7" cy="18" r="1.7"/><circle cx="12" cy="18" r="1.7"/><circle cx="17" cy="18" r="1.7"/></svg>
+      ДАНО
+    </div>
+    <nav class="nav-links">
+      <a href="#gap">Навіщо</a>
+      <a href="#mcp">Як працює</a>
+      <a href="#q">Приклади</a>
+      <a href="#limits">Межі</a>
+    </nav>
+    <a class="btn btn-primary" href="#mcp">Підключити</a>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <div>
+      <h1>Просто спитайте у свого ШІ</h1>
+      <p class="lede">Два MCP-сервери під'єднують Prozorro і НАЗК до вашого асистента. П'ять рядків у налаштуваннях, далі розмова звичайними словами.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#mcp">Підключити</a>
+        <a class="btn btn-ghost" href="#q">Більше прикладів</a>
+      </div>
+    </div>
+
+    <div class="talk">
+      <div>
+        <span class="who">Посадовиця громади</span>
+        <p class="ask">«Скільки сусідні громади платили за такий самий ремонт дороги? Ми не переплачуємо?»</p>
+      </div>
+      <div class="answer">
+        <span class="who">Відповідь асистента</span>
+        <table>
+          <thead><tr><th>Замовник</th><th>Ціна за км</th></tr></thead>
+          <tbody>
+            <tr><td>Громада А</td><td>7,4 млн ₴</td></tr>
+            <tr><td>Громада Б</td><td>8,1 млн ₴</td></tr>
+            <tr><td>Громада В</td><td>6,9 млн ₴</td></tr>
+            <tr><td>Ваш тендер</td><td class="up">11,2 млн ₴</td></tr>
+          </tbody>
+        </table>
+        <p class="note">Приклад того, як виглядає відповідь. Далі можна попросити графік, повний перелік учасників або звіт файлом.</p>
+      </div>
+    </div>
+  </div>
+
+  <section id="gap">
+    <div class="wrap rv">
+      <h2>Дані відкриті. ШІ вміє рахувати. Між ними прірва.</h2>
+      <p class="sub">Держава публікує все безкоштовно. Але сайти пропонують лише ті фільтри, які заздалегідь передбачив розробник, а сирі дані читати неможливо.</p>
+
+      <div class="compare">
+        <div class="card now">
+          <h3>Як це працює зараз</h3>
+          <ul>
+            <li>Питання можна поставити тільки в межах готових фільтрів</li>
+            <li>Складніше порівняння вимагає програміста і окремої вигрузки</li>
+            <li>Тисячі сторінок JSON, коди замість назв</li>
+            <li>Реєстри між собою не пов'язані</li>
+          </ul>
+        </div>
+        <div class="card next">
+          <h3>Як це працює з ДАНО</h3>
+          <ul>
+            <li>Питання формулюється звичайними словами, без обмежень</li>
+            <li>Асистент сам шукає, зіставляє і рахує</li>
+            <li>У відповідь таблиця, графік, граф зв'язків або файл</li>
+            <li>Prozorro, НАЗК і ЄДР доступні в одній розмові</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="mcp">
+    <div class="wrap rv">
+      <h2>MCP це як USB-роз'єм для ШІ</h2>
+      <p class="sub">Стандарт, що дозволяє під'єднати до асистента зовнішнє джерело даних. Далі він користується ним сам.</p>
+
+      <div class="flow">
+        <div>
+          <h3>Вставити конфіг</h3>
+          <p>П'ять рядків у налаштування асистента. Без ключів API і без реєстрації.</p>
+        </div>
+        <div>
+          <h3>Локальний індекс</h3>
+          <p>Кеш тримає повний зріз закупівель з 2015 року, тому відповідь приходить швидко.</p>
+        </div>
+        <div>
+          <h3>Розумна видача</h3>
+          <p>Асистент отримує компактну вижимку, повні документи підтягує лише за потреби.</p>
+        </div>
+      </div>
+
+      <div class="code">
+        <div class="code-top">
+          <span>claude_desktop_config.json</span>
+          <button class="copy" data-copy>Копіювати</button>
+        </div>
+<pre><code>{
+  <span class="k">"mcpServers"</span>: {
+    <span class="k">"dano-prozorro"</span>: {
+      <span class="k">"command"</span>: <span class="s">"npx"</span>,
+      <span class="k">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"@dano/prozorro"</span>]
+    },
+    <span class="k">"dano-nazk"</span>: {
+      <span class="k">"command"</span>: <span class="s">"npx"</span>,
+      <span class="k">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"@dano/nazk"</span>]
+    }
+  }
+}</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="q">
+    <div class="wrap rv">
+      <h2>Дашборд відповідає на закладене. ДАНО на будь-що.</h2>
+      <p class="sub">Ми не вирішуємо за вас, яке запитання ставити, включно з тими, які нам самим не спали на думку.</p>
+
+      <div class="marquee">
+        <div class="marquee-track">
+          <span class="chip">Підприємці</span><span class="chip">Громади</span><span class="chip">Журналісти</span>
+          <span class="chip">Депутати місцевих рад</span><span class="chip">Аудитори</span><span class="chip">Дослідники</span>
+          <span class="chip">Студенти</span><span class="chip">Громадські організації</span>
+          <span class="chip">Підприємці</span><span class="chip">Громади</span><span class="chip">Журналісти</span>
+          <span class="chip">Депутати місцевих рад</span><span class="chip">Аудитори</span><span class="chip">Дослідники</span>
+          <span class="chip">Студенти</span><span class="chip">Громадські організації</span>
+        </div>
+      </div>
+
+      <div class="qgrid">
+        <div class="qq"><p>«Хто в моїй області закуповував будматеріали за останній рік і за якими цінами?»</p><span>Підприємець</span></div>
+        <div class="qq"><p>«Покажи всі закупівлі цього управління за три роки і побудуй графік зміни цін.»</p><span>Журналіст</span></div>
+        <div class="qq"><p>«Хто найчастіше виграє тендери нашої міськради і з яким відсотком перемог?»</p><span>Депутат ради</span></div>
+        <div class="qq"><p>«Збери закупівлі медикаментів по всіх областях у порівняльну таблицю.»</p><span>Дослідниця</span></div>
+        <div class="qq"><p>«Перевір, чи не пов'язані між собою учасники цього тендера.»</p><span>Аудитор</span></div>
+        <div class="qq"><p>«Чи є сенс моїй фірмі заходити в цю нішу і з якою ціною?»</p><span>Малий бізнес</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap rv">
+      <div class="stats">
+        <div class="stat"><div class="n">15M+</div><div class="l">закупівель у локальному індексі</div></div>
+        <div class="stat"><div class="n">2015</div><div class="l">рік, з якого доступні дані</div></div>
+        <div class="stat"><div class="n">2</div><div class="l">MCP-сервери: Prozorro і НАЗК</div></div>
+        <div class="stat"><div class="n">0 ₴</div><div class="l">вартість, без реєстрації</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="limits">
+    <div class="wrap rv">
+      <h2>Чого ДАНО не робить</h2>
+      <p class="sub">Це важливо проговорити, щоб не створювати хибних очікувань.</p>
+      <div class="limits">
+        <div><b>Не робимо власний ШІ</b><p>Ви під'єднуєте той асистент, яким уже користуєтесь.</p></div>
+        <div><b>Не збираємо даних про людей</b><p>Нічого понад те, що держава вже опублікувала сама.</p></div>
+        <div><b>Не виносимо звинувачень</b><p>Інструмент показує факти і ознаки, що потребують уваги. Висновок робить людина.</p></div>
+        <div><b>Не ухвалюємо рішень</b><p>Ми не заміщуємо тендерні комітети і не маємо на це повноважень.</p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-cta">
+      <h2>П'ять рядків, і ваш асистент бачить державні реєстри</h2>
+      <a class="btn btn-primary" href="#mcp">Підключити</a>
+    </div>
+    <div class="credit">
+      <p>Департамент цифрового розвитку, інформаційної політики та кіберзахисту Одеської обласної державної адміністрації</p>
+      <p>Відкриті дані. Відкритий код.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll("[data-copy]").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    var code = btn.closest(".code").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(function(){
+      var t = btn.textContent; btn.textContent = "Скопійовано";
+      setTimeout(function(){ btn.textContent = t; }, 1600);
+    });
+  });
+});
+
+// scroll reveal: sections enter as they become relevant, no scroll listener
+var io = new IntersectionObserver(function(entries){
+  entries.forEach(function(e){
+    if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); }
+  });
+}, { threshold: 0.15 });
+document.querySelectorAll(".rv").forEach(function(el){ io.observe(el); });
+</script>
+</body>
+</html>

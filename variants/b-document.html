@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ДАНО / варіант B «Документ»</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Unbounded:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --paper:#f3f2ef;
+  --paper-2:#e9e7e2;
+  --ink:#14161a;
+  --ink-soft:#565b63;
+  --line:#d3d0c9;
+  --accent:#1b45d8;
+  --display:"Unbounded",system-ui,sans-serif;
+  --sans:"Manrope",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1240px;margin:0 auto;padding:0 28px}
+
+.nav{height:72px;display:flex;align-items:center;border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;width:100%;gap:30px}
+.brand{font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+.brand svg{width:20px;height:20px}
+.nav-links{margin-left:auto;display:flex;gap:28px;font-size:15px;color:var(--ink-soft);font-weight:500}
+.nav-links a:hover{color:var(--ink)}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:46px;padding:0 22px;border-radius:4px;
+  font-size:15px;font-weight:600;transition:transform .16s ease,background .16s ease}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#143bbd}
+.btn-line{border:1px solid var(--ink);color:var(--ink)}
+.btn-line:hover{background:var(--ink);color:var(--paper)}
+
+/* hero: editorial, headline spans, meta column offset */
+.hero{padding:76px 0 64px}
+h1{font-family:var(--display);font-weight:500;font-size:clamp(40px,7vw,92px);line-height:1.02;letter-spacing:-.045em;max-width:15ch}
+h1 em{font-style:normal;color:var(--accent)}
+.hero-row{margin-top:44px;display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:end;border-top:1px solid var(--line);padding-top:28px}
+.lede{font-size:19px;color:var(--ink-soft);max-width:46ch}
+.hero-actions{display:flex;gap:12px;justify-content:flex-end;flex-wrap:wrap}
+.srcline{margin-top:26px;font-family:var(--mono);font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+
+section{padding:88px 0;border-top:1px solid var(--line)}
+h2{font-family:var(--display);font-weight:500;font-size:clamp(28px,4vw,46px);line-height:1.1;letter-spacing:-.035em;max-width:18ch}
+.sub{margin-top:18px;max-width:60ch;color:var(--ink-soft);font-size:17.5px}
+
+/* problem: three wide rows, sparse dividers */
+.rows{margin-top:52px}
+.row{display:grid;grid-template-columns:.9fr 1.4fr;gap:40px;padding:30px 0}
+.row + .row{border-top:1px solid var(--line)}
+.row h3{font-family:var(--display);font-weight:500;font-size:22px;letter-spacing:-.02em;line-height:1.25}
+.row p{color:var(--ink-soft);font-size:17px;max-width:52ch}
+
+/* mcp split with light code card */
+.split{margin-top:52px;display:grid;grid-template-columns:1fr 1.05fr;gap:52px;align-items:start}
+.plain{display:grid;gap:26px}
+.plain p{font-size:17px;color:var(--ink-soft);max-width:44ch}
+.plain b{color:var(--ink)}
+.code{background:#fff;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.code-top{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:12.5px;color:var(--ink-soft)}
+.copy{font:inherit;font-size:12.5px;padding:6px 12px;border:1px solid var(--line);background:var(--paper);border-radius:4px;cursor:pointer}
+.copy:hover{border-color:var(--ink)}
+.code pre{padding:20px 16px;font-family:var(--mono);font-size:13px;line-height:1.8;overflow-x:auto}
+.code .k{color:var(--accent)}
+.code .s{color:#0a7d4c}
+
+/* questions bento */
+.bento{margin-top:52px;display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
+.q{background:#fff;border:1px solid var(--line);border-radius:6px;padding:26px;display:flex;flex-direction:column;justify-content:space-between;gap:20px}
+.q p{font-size:19px;line-height:1.4;letter-spacing:-.01em}
+.q .who{font-family:var(--mono);font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft)}
+.q-a{grid-column:span 3}
+.q-b{grid-column:span 3}
+.q-c{grid-column:span 2}
+.q-d{grid-column:span 2}
+.q-e{grid-column:span 2}
+.q-f{grid-column:span 6;background:var(--accent);border-color:var(--accent);color:#fff}
+.q-f .who{color:rgba(255,255,255,.72)}
+.q-f p{font-size:clamp(21px,2.6vw,30px);max-width:26ch}
+
+/* stats inline */
+.stats{margin-top:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:36px}
+.stat .n{font-family:var(--display);font-weight:500;font-size:clamp(32px,4.4vw,50px);letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.stat .l{margin-top:8px;color:var(--ink-soft);font-size:15px;max-width:22ch}
+
+/* limits panel */
+.panel{margin-top:48px;background:var(--paper-2);border-radius:6px;padding:40px;display:grid;grid-template-columns:1fr 1fr;gap:32px}
+.panel div{max-width:46ch}
+.panel b{font-family:var(--display);font-weight:500;font-size:19px;letter-spacing:-.02em;display:block;margin-bottom:8px}
+.panel p{color:var(--ink-soft);font-size:16.5px}
+
+footer{border-top:1px solid var(--line);padding:64px 0 48px}
+.foot-cta{display:grid;grid-template-columns:1.3fr .7fr;gap:36px;align-items:center;padding-bottom:40px;border-bottom:1px solid var(--line)}
+.foot-cta .btn{justify-self:end}
+.credit{padding-top:28px;display:grid;grid-template-columns:1.3fr .7fr;gap:36px;color:var(--ink-soft);font-size:14.5px}
+
+@media (max-width:940px){
+  .hero-row,.split,.panel,.foot-cta,.credit{grid-template-columns:1fr;gap:26px}
+  .hero-actions{justify-content:flex-start}
+  .foot-cta .btn{justify-self:start}
+  .row{grid-template-columns:1fr;gap:12px}
+  .bento{grid-template-columns:1fr}
+  .q-a,.q-b,.q-c,.q-d,.q-e,.q-f{grid-column:auto}
+  .stats{grid-template-columns:1fr 1fr;gap:28px}
+  .nav-links{display:none}
+  section{padding:60px 0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="3" r="1.7"/><circle cx="7" cy="8" r="1.7"/><circle cx="12" cy="8" r="1.7"/><circle cx="17" cy="8" r="1.7"/><circle cx="2.5" cy="13" r="1.7"/><circle cx="7" cy="13" r="1.7"/><circle cx="12" cy="13" r="2.4"/><circle cx="17" cy="13" r="1.7"/><circle cx="21.5" cy="13" r="1.7"/><circle cx="7" cy="18" r="1.7"/><circle cx="12" cy="18" r="1.7"/><circle cx="17" cy="18" r="1.7"/></svg>
+      ДАНО
+    </div>
+    <nav class="nav-links">
+      <a href="#gap">Навіщо</a>
+      <a href="#mcp">Як працює</a>
+      <a href="#q">Приклади</a>
+      <a href="#limits">Межі</a>
+    </nav>
+    <a class="btn btn-primary" href="#mcp">Підключити</a>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <h1>Дані відкриті. Тепер відкриті й <em>запитання</em>.</h1>
+    <div class="hero-row">
+      <p class="lede">Два MCP-сервери під'єднують Prozorro і НАЗК до вашого ШІ-асистента. П'ять рядків у налаштуваннях, далі просто питайте звичайними словами.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#mcp">Підключити</a>
+        <a class="btn btn-line" href="#q">Приклади запитів</a>
+      </div>
+    </div>
+    <p class="srcline">Prozorro, НАЗК, ЄДР</p>
+  </div>
+
+  <section id="gap">
+    <div class="wrap">
+      <h2>Чому відкритими даними користується вузьке коло людей</h2>
+      <p class="sub">Держава публікує все безкоштовно: закупівлі, декларації посадовців, реєстр юросіб. Формально доступ має кожен. На практиці ні.</p>
+
+      <div class="rows">
+        <div class="row">
+          <h3>Фільтри задає розробник сайту</h3>
+          <p>Поставити можна тільки те запитання, яке хтось заздалегідь передбачив. Усе інше просто недоступне через інтерфейс.</p>
+        </div>
+        <div class="row">
+          <h3>Складніше запитання коштує програміста</h3>
+          <p>«Порівняй це з тим за три роки» вже означає окрему вигрузку і людину, яка її напише. Для більшості це кінець історії.</p>
+        </div>
+        <div class="row">
+          <h3>Сирі дані незручні навіть для фахівця</h3>
+          <p>Тисячі сторінок JSON, коди замість назв, реєстри між собою не пов'язані. ШІ вміє це розібрати, але доступу до даних у нього немає.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="mcp">
+    <div class="wrap">
+      <h2>MCP це як USB-роз'єм для ШІ</h2>
+      <div class="split">
+        <div class="plain">
+          <p><b>Стандарт під'єднання.</b> Він дозволяє дати асистенту зовнішнє джерело даних, і далі той користується ним сам: шукає, бере потрібне, рахує.</p>
+          <p><b>Один раз вставити конфіг.</b> Без програмування, без ключів API, без розуміння того, як усе влаштовано всередині.</p>
+          <p><b>Локальний індекс і кеш.</b> Асистент отримує компактну вижимку, повні документи підтягує лише тоді, коли вони справді потрібні.</p>
+        </div>
+        <div class="code">
+          <div class="code-top">
+            <span>claude_desktop_config.json</span>
+            <button class="copy" data-copy>Копіювати</button>
+          </div>
+<pre><code>{
+  <span class="k">"mcpServers"</span>: {
+    <span class="k">"dano-prozorro"</span>: {
+      <span class="k">"command"</span>: <span class="s">"npx"</span>,
+      <span class="k">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"@dano/prozorro"</span>]
+    },
+    <span class="k">"dano-nazk"</span>: {
+      <span class="k">"command"</span>: <span class="s">"npx"</span>,
+      <span class="k">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"@dano/nazk"</span>]
+    }
+  }
+}</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="q">
+    <div class="wrap">
+      <h2>Дашборд відповідає на закладене. ДАНО на будь-що.</h2>
+      <p class="sub">Ми не вирішуємо за вас, яке запитання ставити. Далі ШІ будує таблиці, графіки, графи зв'язків, готує звіт і зберігає файл.</p>
+
+      <div class="bento">
+        <div class="q q-a"><p>«Хто в моїй області закуповував будматеріали за останній рік і за якими цінами?»</p><span class="who">Підприємець</span></div>
+        <div class="q q-b"><p>«Покажи всі закупівлі цього управління за три роки і побудуй графік зміни цін.»</p><span class="who">Журналіст</span></div>
+        <div class="q q-c"><p>«Хто найчастіше виграє тендери нашої міськради?»</p><span class="who">Депутат ради</span></div>
+        <div class="q q-d"><p>«Збери закупівлі медикаментів по всіх областях у таблицю.»</p><span class="who">Дослідниця</span></div>
+        <div class="q q-e"><p>«Чи не пов'язані між собою учасники цього тендера?»</p><span class="who">Аудитор</span></div>
+        <div class="q q-f"><p>«Скільки сусідні громади платили за такий самий ремонт дороги? Ми не переплачуємо?»</p><span class="who">Посадовець громади</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="stats">
+        <div class="stat"><div class="n">15M+</div><div class="l">закупівель у локальному індексі</div></div>
+        <div class="stat"><div class="n">2015</div><div class="l">рік, з якого доступні дані</div></div>
+        <div class="stat"><div class="n">2</div><div class="l">MCP-сервери: Prozorro і НАЗК</div></div>
+        <div class="stat"><div class="n">0 ₴</div><div class="l">вартість, без реєстрації</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="limits">
+    <div class="wrap">
+      <h2>Чого ДАНО не робить</h2>
+      <div class="panel">
+        <div><b>Не робимо власний ШІ</b><p>Ви під'єднуєте той асистент, яким уже користуєтесь.</p></div>
+        <div><b>Не збираємо даних про людей</b><p>Нічого понад те, що держава вже опублікувала сама.</p></div>
+        <div><b>Не виносимо звинувачень</b><p>Інструмент показує факти і ознаки, що потребують уваги. Висновок робить людина.</p></div>
+        <div><b>Не ухвалюємо рішень</b><p>Ми не заміщуємо тендерні комітети і не маємо на це повноважень.</p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-cta">
+      <h2>П'ять рядків, і ваш асистент бачить державні реєстри</h2>
+      <a class="btn btn-primary" href="#mcp">Підключити</a>
+    </div>
+    <div class="credit">
+      <p>Департамент цифрового розвитку, інформаційної політики та кіберзахисту Одеської обласної державної адміністрації</p>
+      <p>Відкриті дані. Відкритий код.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll("[data-copy]").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    var code = btn.closest(".code").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(function(){
+      var t = btn.textContent; btn.textContent = "Скопійовано";
+      setTimeout(function(){ btn.textContent = t; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>
