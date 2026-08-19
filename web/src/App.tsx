@@ -2,6 +2,7 @@ import { Header } from "./components/Header";
 import { Hero } from "./components/Hero";
 import { Pipeline } from "./components/Pipeline";
 import { BuildOn } from "./components/BuildOn";
+import { ConnectionGraph } from "./components/ConnectionGraph";
 import { Roadmap } from "./components/Roadmap";
 import { Asks, Footer, Gap, Limits, Setup, Stats } from "./components/Sections";
 
@@ -15,6 +16,7 @@ export default function App() {
         <Gap />
         <Setup />
         <Asks />
+        <ConnectionGraph />
         <Stats />
         <BuildOn />
         <Roadmap />
