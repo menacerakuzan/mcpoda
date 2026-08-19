@@ -3,13 +3,13 @@ import { Check, Copy } from "lucide-react";
 
 export const CONFIG = `{
   "mcpServers": {
-    "dano-prozorro": {
+    "proyav-prozorro": {
       "command": "npx",
-      "args": ["-y", "@dano/prozorro"]
+      "args": ["-y", "@proyav/prozorro"]
     },
-    "dano-nazk": {
+    "proyav-nazk": {
       "command": "npx",
-      "args": ["-y", "@dano/nazk"]
+      "args": ["-y", "@proyav/nazk"]
     }
   }
 }`;

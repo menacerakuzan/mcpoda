@@ -65,7 +65,7 @@ export function Header() {
         <div className="flex shrink-0 items-center gap-6 pt-3">
           <a href="#top" className="flex items-center gap-2.5">
             <Mark className="size-[22px] text-accent-soft" />
-            <span className="font-display text-[17px] font-medium tracking-tight">ДАНО</span>
+            <span className="font-display text-[17px] font-medium tracking-tight">ПРОЯВ</span>
           </a>
           <a
             href={DOCS}

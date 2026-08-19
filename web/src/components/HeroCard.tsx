@@ -33,7 +33,7 @@ export function HeroCard() {
           href="#limits"
           className="relative text-[13px] leading-[15.6px] text-accent-soft hover:underline"
         >
-          ЧОГО ДАНО НЕ РОБИТЬ
+          ЧОГО ПРОЯВ НЕ РОБИТЬ
         </a>
       </div>
     </div>

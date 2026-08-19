@@ -53,7 +53,7 @@ export function MobileMenu({ open, onClose }: { open: boolean; onClose: () => vo
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-2.5">
                 <Mark className="size-[22px] text-accent-soft" />
-                <span className="font-display text-[17px] font-medium tracking-tight">ДАНО</span>
+                <span className="font-display text-[17px] font-medium tracking-tight">ПРОЯВ</span>
               </span>
               <button
                 type="button"

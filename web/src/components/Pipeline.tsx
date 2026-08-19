@@ -5,7 +5,7 @@ import { Reveal } from "./Reveal";
 const STEPS = [
   { icon: User, title: "Людина", body: "Питає звичайними словами" },
   { icon: Bot, title: "ШІ-асистент", body: "Той, яким ви вже користуєтесь" },
-  { icon: Mark, title: "ДАНО MCP", body: "Індекс, кеш і компактна видача", accent: true },
+  { icon: Mark, title: "ПРОЯВ MCP", body: "Індекс, кеш і компактна видача", accent: true },
   { icon: Database, title: "Реєстри", body: "Prozorro, НАЗК, ЄДР" },
   { icon: FileBarChart, title: "Результат", body: "Таблиця, графік, граф, звіт" },
 ];
@@ -25,7 +25,7 @@ export function Pipeline() {
               Ми не робимо ще одного чат-бота
             </h2>
             <p className="max-w-[60ch] text-[16.5px] leading-relaxed text-dim">
-              ДАНО це ланка між асистентом, який уже вміє аналізувати, і реєстрами, до яких він
+              ПРОЯВ це ланка між асистентом, який уже вміє аналізувати, і реєстрами, до яких він
               не дотягується. Асистент лишається ваш, дані лишаються державні.
             </p>
           </div>

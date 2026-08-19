@@ -66,7 +66,7 @@ export default function DocsApp() {
         <div className="mx-auto flex h-[68px] max-w-[1240px] items-center gap-5 px-5 sm:px-8">
           <a href={HOME} className="flex shrink-0 items-center gap-2.5">
             <Mark className="size-[20px] text-accent-soft" />
-            <span className="font-display text-[16px] font-medium tracking-tight">ДАНО</span>
+            <span className="font-display text-[16px] font-medium tracking-tight">ПРОЯВ</span>
           </a>
           <span className="hidden font-mono text-[12px] text-dim sm:inline">MCP / документація</span>
           <a
@@ -88,7 +88,7 @@ export default function DocsApp() {
           </div>
 
           <h1 className="max-w-[20ch] font-display text-[clamp(30px,4.6vw,54px)] leading-[1.06] font-medium tracking-[-0.04em]">
-            MCP-сервери <span className="text-accent-soft">ДАНО</span>
+            MCP-сервери <span className="text-accent-soft">ПРОЯВ</span>
           </h1>
           <p className="mt-6 max-w-[68ch] text-[17px] leading-relaxed text-[#c6cad0]">
             Два сервери відкривають AI-асистенту доступ до Prozorro, НАЗК та ЄДР. Один конфіг,
@@ -146,8 +146,12 @@ export default function DocsApp() {
             </p>
             <p className={P}>
               Держава вже публікує закупівлі, декларації та реєстр юросіб. Проблема не в доступі,
-              а в тому, що між сирими даними і людиною стоїть програміст. ДАНО прибирає цю ланку:
+              а в тому, що між сирими даними і людиною стоїть програміст. ПРОЯВ прибирає цю ланку:
               асистент сам шукає, зіставляє і рахує, а людина просто питає.
+            </p>
+            <p className={P}>
+              Назва саме про це. Плівку треба проявити, щоб побачити те, що на ній уже записано.
+              Дані так само вже існують, просто досі їх не було видно.
             </p>
 
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
@@ -182,13 +186,13 @@ export default function DocsApp() {
                   label: "claude_desktop_config.json",
                   code: `{
   "mcpServers": {
-    "dano-prozorro": {
+    "proyav-prozorro": {
       "command": "npx",
-      "args": ["-y", "@dano/prozorro"]
+      "args": ["-y", "@proyav/prozorro"]
     },
-    "dano-nazk": {
+    "proyav-nazk": {
       "command": "npx",
-      "args": ["-y", "@dano/nazk"]
+      "args": ["-y", "@proyav/nazk"]
     }
   }
 }`,
@@ -198,8 +202,8 @@ export default function DocsApp() {
                   label: "Streamable HTTP",
                   code: `{
   "mcpServers": {
-    "dano": {
-      "url": "https://mcp.dano.gov.ua/mcp"
+    "proyav": {
+      "url": "https://mcp.proyav.od.ua/mcp"
     }
   }
 }`,
@@ -233,7 +237,7 @@ export default function DocsApp() {
                 <tbody>
                   {[
                     ["Claude Desktop", "Додати блок mcpServers у claude_desktop_config.json і перезапустити застосунок."],
-                    ["Claude Code", "claude mcp add dano-prozorro -- npx -y @dano/prozorro"],
+                    ["Claude Code", "claude mcp add proyav-prozorro -- npx -y @proyav/prozorro"],
                     ["Cursor", "Налаштування → MCP → додати сервер з тим самим блоком конфігурації."],
                     ["VS Code", "Команда MCP: Add Server, далі той самий конфіг у mcp.json."],
                   ].map(([client, how]) => (
@@ -263,7 +267,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 
 const transport = new StdioClientTransport({
   command: "npx",
-  args: ["-y", "@dano/prozorro"],
+  args: ["-y", "@proyav/prozorro"],
 });
 
 const client = new Client({ name: "my-agent", version: "0.1.0" });
@@ -272,7 +276,7 @@ await client.connect(transport);
 const { tools } = await client.listTools();
 
 const result = await client.callTool({
-  name: "dano_search_tenders",
+  name: "proyav_search_tenders",
   arguments: {
     query: "ремонт дороги",
     region: "UA-51",
@@ -289,7 +293,7 @@ from mcp.client.stdio import stdio_client
 
 params = StdioServerParameters(
     command="npx",
-    args=["-y", "@dano/prozorro"],
+    args=["-y", "@proyav/prozorro"],
 )
 
 async with stdio_client(params) as (read, write):
@@ -299,7 +303,7 @@ async with stdio_client(params) as (read, write):
         tools = await session.list_tools()
 
         result = await session.call_tool(
-            "dano_price_benchmark",
+            "proyav_price_benchmark",
             {"tenderId": "UA-2024-03-11-000123-a"},
         )`,
                 },
@@ -309,7 +313,7 @@ async with stdio_client(params) as (read, write):
                   code: `import { experimental_createMCPClient as createMCPClient } from "ai";
 
 const mcp = await createMCPClient({
-  transport: { type: "stdio", command: "npx", args: ["-y", "@dano/prozorro"] },
+  transport: { type: "stdio", command: "npx", args: ["-y", "@proyav/prozorro"] },
 });
 
 const tools = await mcp.tools();
@@ -334,7 +338,7 @@ const result = await streamText({
 
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
               {[
-                ["Тільки читання", "Сервери не мають жодного write-tool. Змінити щось у державному реєстрі через ДАНО неможливо."],
+                ["Тільки читання", "Сервери не мають жодного write-tool. Змінити щось у державному реєстрі через ПРОЯВ неможливо."],
                 ["Кеш і свіжість", "Індекс оновлюється інкрементально. Кожна відповідь містить indexedAt, щоб асистент міг сказати, наскільки дані свіжі."],
                 ["Ліміти", "Обмеження на частоту застосовуються до HTTP-режиму. Локальний stdio-сервер працює на вашій машині і лімітів не має."],
                 ["Персональні дані", "Ми не збагачуємо декларації сторонніми джерелами і не додаємо нічого, чого немає в оригінальній публікації."],
@@ -424,10 +428,10 @@ const result = await streamText({
                     {
                       id: "s1",
                       label: "потік викликів",
-                      code: `1. dano_get_tender(tenderId)            → предмет, очікувана вартість, CPV
-2. dano_price_benchmark(tenderId)       → медіана і розкид схожих закупівель
-3. dano_list_tender_bids(tenderId)      → скільки учасників, який крок зниження
-4. dano_get_supplier_profile(edrpou)    → історія перемог у цього замовника
+                      code: `1. proyav_get_tender(tenderId)            → предмет, очікувана вартість, CPV
+2. proyav_price_benchmark(tenderId)       → медіана і розкид схожих закупівель
+3. proyav_list_tender_bids(tenderId)      → скільки учасників, який крок зниження
+4. proyav_get_supplier_profile(edrpou)    → історія перемог у цього замовника
 
    • відхилення від медіани саме по собі не є порушенням
    • один учасник і нульове зниження ціни це привід подивитись уважніше
@@ -447,10 +451,10 @@ const result = await streamText({
                     {
                       id: "s2",
                       label: "потік викликів",
-                      code: `1. dano_list_tender_bids(tenderId)      → перелік учасників з кодами ЄДРПОУ
-2. dano_find_connections(edrpou[])      → спільні засновники, керівники, адреси
-3. dano_list_entity_officers(edrpou)    → дати призначень і змін
-4. dano_search_declarations(ПІБ)        → чи декларував посадовець ці права
+                      code: `1. proyav_list_tender_bids(tenderId)      → перелік учасників з кодами ЄДРПОУ
+2. proyav_find_connections(edrpou[])      → спільні засновники, керівники, адреси
+3. proyav_list_entity_officers(edrpou)    → дати призначень і змін
+4. proyav_search_declarations(ПІБ)        → чи декларував посадовець ці права
 
    • збіг адреси може означати бізнес-центр, а не змову
    • перевіряйте дати: зв'язок міг існувати до або після торгів`,
@@ -469,10 +473,10 @@ const result = await streamText({
                     {
                       id: "s3",
                       label: "потік викликів",
-                      code: `1. dano_search_tenders(query, region, dateFrom, dateTo)
-2. dano_compare_buyers(buyerIds[], cpv)  → ціна за одиницю по кожному замовнику
-3. dano_aggregate_spend(cpv, region)     → загальні обсяги за період
-4. dano_export_dataset(filter)           → таблиця для звіту
+                      code: `1. proyav_search_tenders(query, region, dateFrom, dateTo)
+2. proyav_compare_buyers(buyerIds[], cpv)  → ціна за одиницю по кожному замовнику
+3. proyav_aggregate_spend(cpv, region)     → загальні обсяги за період
+4. proyav_export_dataset(filter)           → таблиця для звіту
 
    • порівнюйте однакові одиниці виміру, інакше цифри непорівнянні`,
                     },
@@ -490,7 +494,7 @@ const result = await streamText({
                 ["-32602 Invalid params", "Аргумент не пройшов валідацію схеми. Схема приходить разом зі списком tools."],
                 ["429 Too Many Requests", "Ліміт частоти в HTTP-режимі. Використовуйте експоненційний backoff або локальний stdio-сервер."],
                 ["503 Index rebuilding", "Індекс оновлюється. Відповідь містить retryAfter, дані не втрачені."],
-                ["Обрізана вибірка", "Запит зачепив забагато рядків. Звузьте період чи регіон або скористайтесь dano_export_dataset."],
+                ["Обрізана вибірка", "Запит зачепив забагато рядків. Звузьте період чи регіон або скористайтесь proyav_export_dataset."],
                 ["Відсутні дані в джерелі", "Частина старих процедур опублікована неповно. Сервер повертає поле sourceGaps замість того, щоб домальовувати відсутнє."],
               ].map(([code, body]) => (
                 <div key={code} className="flex flex-col gap-2 p-5 sm:flex-row sm:gap-6">

@@ -156,7 +156,7 @@ export function Asks() {
     <section id="asks" className="border-t border-line py-24 sm:py-32">
       <div className={SHELL}>
         <Reveal>
-          <h2 className={H2}>Дашборд відповідає на закладене. ДАНО на будь-що.</h2>
+          <h2 className={H2}>Дашборд відповідає на закладене. ПРОЯВ на будь-що.</h2>
           <p className={SUB}>
             Ми не вирішуємо за вас, яке запитання ставити. Далі ШІ будує таблиці, графіки,
             графи зв'язків, готує звіт і зберігає файл.
@@ -253,7 +253,7 @@ export function Stats() {
 const limits = [
   {
     q: "Ви робите власний ШІ?",
-    a: "Ні. Ви під'єднуєте той асистент, яким уже користуєтесь. ДАНО дає йому доступ до реєстрів і більше нічого.",
+    a: "Ні. Ви під'єднуєте той асистент, яким уже користуєтесь. ПРОЯВ дає йому доступ до реєстрів і більше нічого.",
   },
   {
     q: "Ви збираєте дані про людей?",
@@ -276,7 +276,7 @@ export function Limits() {
     <section id="limits" className="border-t border-line py-24 sm:py-32">
       <div className={`${SHELL} grid gap-12 lg:grid-cols-[0.9fr_1.3fr] lg:gap-20`}>
         <Reveal>
-          <h2 className={H2}>Чого ДАНО не робить</h2>
+          <h2 className={H2}>Чого ПРОЯВ не робить</h2>
           <p className={SUB}>
             Це важливо проговорити, щоб не створювати хибних очікувань.
           </p>

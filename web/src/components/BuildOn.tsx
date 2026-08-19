@@ -38,7 +38,7 @@ export function BuildOn() {
       <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
         <Reveal>
           <h2 className="max-w-[19ch] font-display text-[clamp(26px,3.6vw,44px)] leading-[1.12] font-medium tracking-[-0.038em]">
-            Що можна побудувати поверх ДАНО
+            Що можна побудувати поверх ПРОЯВ
           </h2>
           <p className="mt-5 max-w-[58ch] text-[17px] leading-relaxed text-dim">
             Продукт це інструмент, а не одне готове рішення. Перевірку тендерів ми зберемо самі,
