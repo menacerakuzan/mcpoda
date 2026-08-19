@@ -5,6 +5,7 @@ import { ConfigCard } from "./ConfigCard";
 import { Reveal } from "./Reveal";
 import { LiquidMetalButton } from "./LiquidMetalButton";
 import { Mark } from "./Mark";
+import { DOCS } from "../lib/paths";
 
 const H2 =
   "font-display text-[clamp(26px,3.6vw,44px)] leading-[1.12] font-medium tracking-[-0.038em]";
@@ -107,7 +108,7 @@ export function Setup() {
               Claude, Cursor та інші клієнти з підтримкою MCP
             </p>
             <a
-              href="/docs/"
+              href={DOCS}
               className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-accent-soft hover:underline"
             >
               Документація і перелік tools
@@ -347,7 +348,7 @@ export function Footer() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-6">
-            <a href="/docs/" className="text-fg transition-colors hover:text-accent-soft">
+            <a href={DOCS} className="text-fg transition-colors hover:text-accent-soft">
               Документація MCP
             </a>
             <a

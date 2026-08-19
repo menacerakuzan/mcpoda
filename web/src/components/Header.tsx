@@ -4,6 +4,7 @@ import { DynamicActionBar, type ActionItem } from "./DynamicActionBar";
 import { LiquidMetalButton } from "./LiquidMetalButton";
 import { Mark } from "./Mark";
 import { MobileMenu } from "./MobileMenu";
+import { DOCS } from "../lib/paths";
 
 const Row = ({
   title,
@@ -67,7 +68,7 @@ export function Header() {
             <span className="font-display text-[17px] font-medium tracking-tight">ДАНО</span>
           </a>
           <a
-            href="/docs/"
+            href={DOCS}
             className="hidden text-[14px] text-dim transition-colors hover:text-fg lg:inline"
           >
             Документація

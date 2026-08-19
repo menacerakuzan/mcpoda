@@ -4,6 +4,7 @@ import { CodeBlock } from "../components/CodeBlock";
 import { LiquidMetalButton } from "../components/LiquidMetalButton";
 import { Mark } from "../components/Mark";
 import { TOOL_COUNT, TOOL_GROUPS } from "./tools";
+import { HOME } from "../lib/paths";
 
 const SECTIONS = [
   { id: "about", label: "Що це і навіщо" },
@@ -63,13 +64,13 @@ export default function DocsApp() {
     <div className="min-h-screen bg-ink">
       <header className="sticky top-0 z-30 border-b border-line bg-ink/85 backdrop-blur-xl">
         <div className="mx-auto flex h-[68px] max-w-[1240px] items-center gap-5 px-5 sm:px-8">
-          <a href="/" className="flex shrink-0 items-center gap-2.5">
+          <a href={HOME} className="flex shrink-0 items-center gap-2.5">
             <Mark className="size-[20px] text-accent-soft" />
             <span className="font-display text-[16px] font-medium tracking-tight">ДАНО</span>
           </a>
           <span className="hidden font-mono text-[12px] text-dim sm:inline">MCP / документація</span>
           <a
-            href="/"
+            href={HOME}
             className="ml-auto inline-flex items-center gap-2 text-[14px] text-dim transition-colors hover:text-fg"
           >
             <ArrowLeft className="size-4" strokeWidth={1.75} />

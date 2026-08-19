@@ -2,13 +2,14 @@ import { useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
 import { Mark } from "./Mark";
+import { DOCS } from "../lib/paths";
 
 const LINKS = [
   { href: "#gap", label: "Навіщо" },
   { href: "#setup", label: "Як працює" },
   { href: "#asks", label: "Приклади" },
   { href: "#limits", label: "Межі" },
-  { href: "/docs/", label: "Документація" },
+  { href: DOCS, label: "Документація" },
 ];
 
 const ease = [0.76, 0, 0.24, 1] as const;
