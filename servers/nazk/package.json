@@ -6,7 +6,8 @@
     "build": "tsc",
     "test": "npm run build && node --test test/*.test.ts",
     "test:contract": "npm run build && node --test test/live/*.test.ts",
-    "smoke": "npm run build && node scripts/smoke.mjs"
+    "smoke": "npm run build && node scripts/smoke.mjs",
+    "prepublishOnly": "npm run build && npm test"
   },
   "author": "",
   "license": "MIT",
@@ -23,9 +24,30 @@
     "proyav-nazk": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/menacerakuzan/mcpoda.git",
+    "directory": "servers/nazk"
+  },
+  "homepage": "https://github.com/menacerakuzan/mcpoda/tree/main/servers/nazk#readme",
+  "bugs": {
+    "url": "https://github.com/menacerakuzan/mcpoda/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ukraine",
+    "open-data",
+    "nazk"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -12,7 +12,8 @@
     "crawl": "npm run build && node dist/cli.js crawl",
     "index:stats": "node dist/cli.js stats",
     "serve": "npm run build && node dist/serve.js",
-    "smoke:http": "npm run build && node scripts/smoke-http.mjs"
+    "smoke:http": "npm run build && node scripts/smoke-http.mjs",
+    "prepublishOnly": "npm run build && npm test"
   },
   "author": "",
   "license": "MIT",
@@ -30,9 +31,30 @@
     "proyav-prozorro-serve": "dist/serve.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/menacerakuzan/mcpoda.git",
+    "directory": "servers/prozorro"
+  },
+  "homepage": "https://github.com/menacerakuzan/mcpoda/tree/main/servers/prozorro#readme",
+  "bugs": {
+    "url": "https://github.com/menacerakuzan/mcpoda/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ukraine",
+    "open-data",
+    "prozorro"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

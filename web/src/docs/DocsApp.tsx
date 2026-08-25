@@ -90,21 +90,21 @@ export default function DocsApp() {
         <div className="mx-auto max-w-[1240px] px-5 py-16 sm:px-8 sm:py-20">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 font-mono text-[11.5px] tracking-wide text-amber-200">
             <AlertTriangle className="size-3.5" strokeWidth={2} />
-            СЕРВЕР ПРАЦЮЄ, АЛЕ ЩЕ НЕ ОПУБЛІКОВАНИЙ ПУБЛІЧНО
+            ДВА СЕРВЕРИ ПРАЦЮЮТЬ, ПАКЕТИ ЩЕ НЕ В NPM
           </div>
 
           <h1 className="max-w-[20ch] font-display text-[clamp(30px,4.6vw,54px)] leading-[1.06] font-medium tracking-[-0.04em]">
             MCP-сервери <span className="text-accent-soft">ПРОЯВ</span>
           </h1>
           <p className="mt-6 max-w-[68ch] text-[17px] leading-relaxed text-[#c6cad0]">
-            Два сервери відкривають AI-асистенту доступ до Prozorro, НАЗК та ЄДР. Один конфіг,
-            жодних ключів API і жодної реєстрації: дані вже публічні, ми лише робимо їх придатними
-            для роботи асистента.
+            Два сервери відкривають AI-асистенту доступ до Prozorro і до Єдиного державного
+            реєстру декларацій. Один конфіг, жодних ключів API і жодної реєстрації: дані вже
+            публічні, ми лише робимо їх придатними для роботи асистента.
           </p>
 
           <dl className="mt-12 grid gap-8 border-t border-line pt-8 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              ["ТРАНСПОРТ", "stdio та Streamable HTTP"],
+              ["СЕРВЕРИ", "Prozorro і НАЗК"],
               ["АВТОРИЗАЦІЯ", "не потрібна"],
               ["TOOLS", `${WORKING_COUNT} працюють`],
               ["ДАНІ", "з 2015 року"],
