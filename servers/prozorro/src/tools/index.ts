@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { asJsonContent, projectHit, projectTender } from "../format.js";
 import { SourceError } from "../http.js";
 import { fetchFeedPage, fetchTender, tenderWebUrl } from "../sources/cdb.js";
+import { resolveTenderId } from "../resolve.js";
 import {
   searchTenders,
   SOURCE_PAGE_SIZE,
@@ -202,13 +203,22 @@ export function registerTools(server: McpServer) {
     },
     async ({ id, full }) =>
       guard(async () => {
-        const uuid = /^[0-9a-f]{32}$/i.test(id)
-          ? id
-          : await resolveTenderId(id);
+        let uuid: string | null = null;
+        let outcome: Awaited<ReturnType<typeof resolveTenderId>> | null = null;
+
+        if (/^[0-9a-f]{32}$/i.test(id)) {
+          uuid = id;
+        } else {
+          outcome = await resolveTenderId(id);
+          if (outcome.found) uuid = outcome.uuid;
+        }
 
         if (!uuid) {
           return asJsonContent({
-            error: "not_found",
+            error:
+              outcome && !outcome.found && outcome.reason === "bad_format"
+                ? "bad_format"
+                : "not_found",
             message: [
               `Не вдалося знайти процедуру ${id} у стрічці змін за розумний час.`,
               "Стрічка впорядкована за датою останньої зміни, тому давні процедури можуть лежати далеко",
@@ -297,50 +307,4 @@ export function registerTools(server: McpServer) {
         });
       }),
   );
-}
-
-/**
- * The search service knows procedures by their UA- number, the central database
- * knows them by an internal uuid, and nothing maps between the two.
- *
- * The feed is a changes feed: every procedure sits at its LAST modification, not
- * at its creation. So we walk it backwards from now and stop as soon as entries
- * predate the day the number was issued, because a procedure cannot have been
- * modified before it existed. That makes the scan cheap for anything still alive
- * and correctly hopeless for a procedure untouched for years, which is exactly
- * the case the local index is meant to solve.
- */
-const MAX_SCAN_PAGES = 6;
-
-async function resolveTenderId(tenderID: string): Promise<string | null> {
-  // the trailing suffix is lower case in real data ("-a"), so upper-casing the
-  // whole number would make every comparison miss
-  const wanted = tenderID.trim();
-  const match = /^UA-(\d{4}-\d{2}-\d{2})-/i.exec(wanted);
-  if (!match) return null;
-
-  const issuedAt = new Date(`${match[1]}T00:00:00Z`).getTime();
-  let offset: string | undefined;
-
-  for (let pageIndex = 0; pageIndex < MAX_SCAN_PAGES; pageIndex++) {
-    const page = await fetchFeedPage({
-      limit: 1000,
-      descending: true,
-      offset,
-      fields: ["tenderID"],
-    });
-
-    const hit = page.data.find(
-      (entry) => entry.tenderID?.toLowerCase() === wanted.toLowerCase(),
-    );
-    if (hit) return hit.id;
-
-    const oldest = page.data[page.data.length - 1]?.dateModified;
-    if (oldest && new Date(oldest).getTime() < issuedAt) return null;
-
-    if (!page.next_page?.offset || page.data.length === 0) return null;
-    offset = page.next_page.offset;
-  }
-
-  return null;
 }
