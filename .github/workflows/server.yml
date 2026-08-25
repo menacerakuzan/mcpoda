@@ -50,5 +50,7 @@ jobs:
           cache-dependency-path: servers/prozorro/package-lock.json
       - run: npm ci
       - run: npm run test:contract
-      - name: Смоук через MCP-клієнт
+      - name: Смоук через MCP-клієнт (stdio)
         run: npm run smoke
+      - name: Смоук через MCP-клієнт (HTTP)
+        run: npm run smoke:http
