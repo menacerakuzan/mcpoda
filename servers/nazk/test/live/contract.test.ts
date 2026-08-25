@@ -12,7 +12,27 @@ import { fetchDocument, searchDocuments } from "../../dist/source.js";
 
 const TIMEOUT = 40_000;
 
-describe("реєстр декларацій НАЗК", { timeout: TIMEOUT }, () => {
+/**
+ * The register answers from Ukraine and returns 403 to GitHub's runners, so CI
+ * cannot reach it. Failing there would teach everyone to ignore a red build for
+ * a reason that has nothing to do with our code, and passing silently would hide
+ * a real outage. So the suite checks first and skips loudly with the reason.
+ */
+const reachable = await (async () => {
+  try {
+    await searchDocuments({ query: "Петренко" });
+    return { ok: true as const };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false as const, message };
+  }
+})();
+
+const skip = reachable.ok
+  ? false
+  : `Реєстр недоступний з цієї машини: ${reachable.message.slice(0, 120)}. З адрес за межами України він відповідає 403.`;
+
+describe("реєстр декларацій НАЗК", { timeout: TIMEOUT, skip }, () => {
   it("шукає за прізвищем без ключа", async () => {
     const response = await searchDocuments({ query: "Петренко" });
 
