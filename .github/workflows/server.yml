@@ -17,18 +17,22 @@ permissions:
 
 jobs:
   build:
-    name: Збірка і юніт-тести
+    name: Збірка і юніт-тести (${{ matrix.server }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        server: [prozorro, nazk]
     defaults:
       run:
-        working-directory: servers/prozorro
+        working-directory: servers/${{ matrix.server }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: servers/prozorro/package-lock.json
+          cache-dependency-path: servers/${{ matrix.server }}/package-lock.json
       - run: npm ci
       - run: npm test
 
@@ -54,3 +58,10 @@ jobs:
         run: npm run smoke
       - name: Смоук через MCP-клієнт (HTTP)
         run: npm run smoke:http
+
+      - name: Реєстр декларацій НАЗК
+        working-directory: servers/nazk
+        run: |
+          npm ci
+          npm run test:contract
+          npm run smoke

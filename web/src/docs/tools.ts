@@ -112,6 +112,40 @@ export const TOOL_GROUPS: ToolGroup[] = [
     ],
   },
   {
+    id: "nazk",
+    title: "Декларації НАЗК",
+    note: "Окремий сервер. Локального індексу декларацій немає навмисно: запити йдуть до реєстру на вимогу.",
+    tools: [
+      {
+        name: "proyav_search_declarations",
+        summary: "Пошук декларацій за прізвищем, роком і типом.",
+        status: "працює",
+        badges: ["source"],
+      },
+      {
+        name: "proyav_get_declaration",
+        summary:
+          "Доходи, майно, транспорт, корпоративні права. Адреси та дати народження родичів не передаються навіть там, де реєстр лишає їх відкритими.",
+        status: "працює",
+        badges: ["source"],
+      },
+      {
+        name: "proyav_declarant_history",
+        summary:
+          "Усі декларації однієї особи по роках, з позначкою, яка версія за рік є чинною.",
+        status: "працює",
+        badges: ["source"],
+      },
+      {
+        name: "proyav_compare_declarations",
+        summary:
+          "Що змінилось між двома деклараціями однієї особи. Попереджає, якщо взято замінену декларацію або дві за один рік.",
+        status: "працює",
+        badges: ["source"],
+      },
+    ],
+  },
+  {
     id: "planned",
     title: "У роботі",
     note: "Специфікація, а не працюючий API. Назви й аргументи можуть змінитись.",
@@ -126,11 +160,6 @@ export const TOOL_GROUPS: ToolGroup[] = [
         name: "proyav_get_supplier_profile",
         summary:
           "Історія участі фірми: перемоги, відсоток успіху, ключові замовники.",
-        status: "у планах",
-      },
-      {
-        name: "proyav_search_declarations",
-        summary: "Декларації НАЗК. Окремий сервер, потребує правової рамки перед кодом.",
         status: "у планах",
       },
       {
