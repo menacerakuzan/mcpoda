@@ -120,6 +120,43 @@ describe("aggregate", () => {
   });
 });
 
+describe("відтворюваність", () => {
+  it("однакові суми не міняють порядок від виклику до виклику", () => {
+    // Honest note: this one passes with or without the explicit tiebreaker in the
+    // query, checked by removing it. SQLite's GROUP BY always emits rows ordered
+    // by the grouping key, so ties are stable today by accident of the engine
+    // rather than by promise. The tiebreaker stays because SQL guarantees nothing
+    // here and a future index or plan change would be silent; the test stays as a
+    // canary for that day, not as proof of a bug that was fixed.
+    for (let i = 1; i <= 10; i++) {
+      db.prepare("insert or ignore into buyers (edrpou, name, region) values (?, ?, 'Область')").run(
+        String(i).padStart(8, "0"),
+        `Рада ${i}`,
+      );
+      tender({ n: i, edrpou: String(i).padStart(8, "0"), amount: 1000 });
+    }
+
+    const runs = new Set(
+      Array.from({ length: 5 }, () =>
+        aggregate(db, { dimension: "buyer", limit: 4 })
+          .rows.map((r) => r.key)
+          .join(","),
+      ),
+    );
+
+    assert.equal(runs.size, 1, `порядок плаває: ${[...runs].join(" | ")}`);
+  });
+
+  it("той самий запит дає ті самі числа", () => {
+    tender({ n: 1, amount: 100 });
+    tender({ n: 2, amount: 300 });
+
+    const first = JSON.stringify(aggregate(db, { dimension: "buyer" }).rows);
+    const second = JSON.stringify(aggregate(db, { dimension: "buyer" }).rows);
+    assert.equal(first, second);
+  });
+});
+
 describe("compareBuyers", () => {
   it("порівнює ціну за одиницю між замовниками", () => {
     // Перша рада: 10 і 20 грн/кг, Друга: 100 грн/кг

@@ -181,7 +181,11 @@ export function benchmark(
   const sampleSize = Math.min(options.sampleSize ?? 5, 20);
   const sample = [...comparables]
     .filter((c) => (perUnit ? c.unitPrice : c.total))
-    .sort((a, b) => (perUnit ? a.unitPrice! - b.unitPrice! : a.total - b.total))
+    .sort(
+      (a, b) =>
+        (perUnit ? a.unitPrice! - b.unitPrice! : a.total - b.total) ||
+        (a.tenderID ?? "").localeCompare(b.tenderID ?? ""),
+    )
     .filter((_, index, all) =>
       // ends and middle: enough to see the spread without dumping the whole set
       [0, Math.floor(all.length / 4), Math.floor(all.length / 2), Math.floor((all.length * 3) / 4), all.length - 1]

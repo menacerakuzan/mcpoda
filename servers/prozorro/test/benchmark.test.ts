@@ -141,6 +141,33 @@ describe("порівняння ціни", () => {
     assert.equal(result.position.dearerCount, 0, "дорожчих за 100 грн/кг у вибірці бути не може");
   });
 
+  it("повторний виклик дає той самий результат", () => {
+    marketOfTen();
+    const subject = insert({ n: 20, amount: 100 * 100, quantity: 100 });
+
+    const first = benchmark(db, { tenderID: subject });
+    const second = benchmark(db, { tenderID: subject });
+    assert.equal(JSON.stringify(first), JSON.stringify(second));
+  });
+
+  it("показує вибірку, на якій зроблено висновок", () => {
+    // a verdict without the sample behind it is an opinion, not a measurement
+    marketOfTen();
+    const subject = insert({ n: 20, amount: 100 * 100, quantity: 100 });
+
+    const result = benchmark(db, { tenderID: subject });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+
+    assert.ok(result.sample.length > 0, "вибірка порожня");
+    assert.ok(result.distribution.count >= 8, "не видно, скільки процедур у вибірці");
+    assert.ok(result.period.from && result.period.to, "не видно періоду вибірки");
+    for (const item of result.sample) {
+      assert.ok(item.tenderID, "у прикладі немає номера, його неможливо перевірити");
+      assert.ok(item.date, "у прикладі немає дати");
+    }
+  });
+
   it("відмовляється рахувати, коли схожих замало", () => {
     for (let i = 1; i <= 4; i++) insert({ n: i, amount: 5000, quantity: 100 });
     const subject = insert({ n: 20, amount: 9000, quantity: 100 });
