@@ -36,15 +36,20 @@ export type SearchQuery = {
   text: string;
   status?: string[];
   page?: number;
-  perPage?: number;
 };
+
+/**
+ * The service always returns exactly 20 records: `per_page` is accepted and then
+ * ignored, and the response echoes 20 whatever you send. Page size is therefore
+ * a constant here, and anything larger is assembled from consecutive pages.
+ */
+export const SOURCE_PAGE_SIZE = 20;
 
 export async function searchTenders(
   query: SearchQuery,
 ): Promise<SearchResponse> {
   const body: Record<string, unknown> = {
     text: query.text,
-    per_page: Math.min(Math.max(query.perPage ?? 20, 1), 100),
     // the validator demands page >= 1 even though responses report page 0
     page: Math.max(query.page ?? 1, 1),
   };

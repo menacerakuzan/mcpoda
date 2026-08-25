@@ -3,7 +3,12 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { asJsonContent, projectHit, projectTender } from "../format.js";
 import { SourceError } from "../http.js";
 import { fetchFeedPage, fetchTender, tenderWebUrl } from "../sources/cdb.js";
-import { searchTenders, TENDER_STATUSES } from "../sources/search.js";
+import {
+  searchTenders,
+  SOURCE_PAGE_SIZE,
+  TENDER_STATUSES,
+  type SearchHit,
+} from "../sources/search.js";
 
 const SOURCE_NOTE =
   "Джерело: відкриті дані Prozorro. Сервер лише читає, нічого не змінює в реєстрі.";
@@ -41,10 +46,12 @@ export function registerTools(server: McpServer) {
         "Повертає компактні картки (номер, назва, сума, статус, замовник, регіон), а не повні записи.",
         "Щоб отримати склад позицій, учасників і переможця, візьміть tenderID і викличте proyav_get_tender.",
         "",
-        "Обмеження джерела: пошук бачить максимум 10 000 збігів на запит, тому для широких тем звужуйте",
-        "запит словами або статусом, а не гортайте сторінки до кінця.",
-        "Фільтр за регіоном застосовується вже до отриманої сторінки, тож при вузькому регіоні",
-        "збільшуйте perPage або уточнюйте текст запиту.",
+        "Обмеження джерела, які варто мати на увазі:",
+        "джерело віддає рівно 20 записів на сторінку і не дозволяє просити більше, тому limit понад 20",
+        "сервер набирає, дочитуючи наступні сторінки;",
+        "пошук бачить максимум 10 000 збігів на запит, тож широкі теми звужуйте словами або статусом;",
+        "region, minValue та maxValue джерело не підтримує, сервер застосовує їх до вже отриманих",
+        "записів, тому за вузького фільтра просіть більший limit.",
       ].join("\n"),
       inputSchema: {
         text: z
@@ -61,7 +68,7 @@ export function registerTools(server: McpServer) {
           .string()
           .optional()
           .describe(
-            "Назва області для фільтрації, наприклад «Одеська область». Порівняння без урахування регістру.",
+            "Назва області, наприклад «Одеська область». Порівняння без урахування регістру.",
           ),
         minValue: z
           .number()
@@ -71,49 +78,93 @@ export function registerTools(server: McpServer) {
           .number()
           .optional()
           .describe("Максимальна очікувана вартість, грн."),
-        page: z.number().int().min(1).optional().describe("Сторінка, від 1."),
-        perPage: z
+        limit: z
           .number()
           .int()
           .min(1)
           .max(100)
           .optional()
-          .describe("Розмір сторінки, максимум 100."),
+          .describe(
+            "Скільки карток повернути після фільтрів. За замовчуванням 20, максимум 100.",
+          ),
+        page: z
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .describe(
+            "З якої сторінки джерела починати. Сторінка це 20 записів.",
+          ),
       },
     },
-    async ({ text, status, region, minValue, maxValue, page, perPage }) =>
+    async ({ text, status, region, minValue, maxValue, limit, page }) =>
       guard(async () => {
-        const response = await searchTenders({ text, status, page, perPage });
+        const wanted = limit ?? SOURCE_PAGE_SIZE;
+        const startPage = page ?? 1;
+        const maxRequests = Math.min(
+          Math.ceil(wanted / SOURCE_PAGE_SIZE) +
+            (region || minValue !== undefined || maxValue !== undefined
+              ? 2
+              : 0),
+          6,
+        );
 
         // keep the raw hit next to its projection: filtering the projections
         // alone would drift the indexes apart from the source records
-        let rows = response.data.map((hit) => ({ hit, card: projectHit(hit) }));
-        const received = rows.length;
+        let rows: Array<{
+          hit: SearchHit;
+          card: ReturnType<typeof projectHit>;
+        }> = [];
+        let received = 0;
+        let total = 0;
+        let pagesRead = 0;
 
-        if (region) {
-          const needle = region.toLowerCase();
-          rows = rows.filter((row) =>
-            row.card.buyer.region?.toLowerCase().includes(needle),
-          );
-        }
-        if (minValue !== undefined || maxValue !== undefined) {
-          rows = rows.filter(({ hit }) => {
-            const amount = hit.value?.amount;
-            if (amount === undefined) return false;
-            if (minValue !== undefined && amount < minValue) return false;
-            if (maxValue !== undefined && amount > maxValue) return false;
-            return true;
+        for (let i = 0; i < maxRequests && rows.length < wanted; i++) {
+          const response = await searchTenders({
+            text,
+            status,
+            page: startPage + i,
           });
+          total = response.total;
+          pagesRead++;
+          received += response.data.length;
+
+          let batch = response.data.map((hit) => ({
+            hit,
+            card: projectHit(hit),
+          }));
+
+          if (region) {
+            const needle = region.toLowerCase();
+            batch = batch.filter((row) =>
+              row.card.buyer.region?.toLowerCase().includes(needle),
+            );
+          }
+          if (minValue !== undefined || maxValue !== undefined) {
+            batch = batch.filter(({ hit }) => {
+              const amount = hit.value?.amount;
+              if (amount === undefined) return false;
+              if (minValue !== undefined && amount < minValue) return false;
+              if (maxValue !== undefined && amount > maxValue) return false;
+              return true;
+            });
+          }
+
+          rows = rows.concat(batch);
+          if (response.data.length < SOURCE_PAGE_SIZE) break;
         }
+
+        const results = rows.slice(0, wanted);
 
         return asJsonContent({
           query: { text, status, region, minValue, maxValue },
-          page: response.page,
-          perPage: response.per_page,
-          totalMatches: response.total,
-          returned: rows.length,
-          filteredOutOnThisPage: received - rows.length,
-          results: rows.map((row) => row.card),
+          totalMatches: total,
+          returned: results.length,
+          scanned: received,
+          pagesRead,
+          startPage,
+          nextPage: startPage + pagesRead,
+          results: results.map((row) => row.card),
           source: SOURCE_NOTE,
         });
       }),
