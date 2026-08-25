@@ -1,7 +1,10 @@
+export type ToolStatus = "працює" | "у планах";
+
 export type Tool = {
   name: string;
   summary: string;
-  badges?: Array<"cache" | "bulk" | "export">;
+  status: ToolStatus;
+  badges?: Array<"index" | "analysis" | "source">;
 };
 
 export type ToolGroup = {
@@ -12,150 +15,125 @@ export type ToolGroup = {
 };
 
 /**
- * Draft surface of the two servers. Names and arguments are a specification we
- * are still writing, not a shipped API: the live list always comes from
- * `tools/list` once a server is running.
+ * Two lists in one, and the difference is marked on every row: what the server
+ * already does, and what is still a specification. The page carried twenty-four
+ * planned tools while eight existed, and a documentation page that promises more
+ * than the code delivers is the fastest way to lose a person's trust.
  */
 export const TOOL_GROUPS: ToolGroup[] = [
   {
-    id: "tenders",
-    title: "Закупівлі Prozorro",
-    note: "Ядро сервера. Пошук завжди повертає компактну вижимку, повну картку тендера підтягуємо окремим викликом.",
+    id: "search",
+    title: "Пошук і картки",
+    note: "Працює одразу після підключення, без жодних налаштувань і локальної бази.",
     tools: [
       {
         name: "proyav_search_tenders",
-        summary: "Пошук закупівель за словами, періодом, регіоном, CPV та діапазоном сум.",
-        badges: ["cache"],
+        summary:
+          "Повнотекстовий пошук закупівель за словами, статусом, регіоном і діапазоном сум.",
+        status: "працює",
+        badges: ["source"],
       },
       {
         name: "proyav_get_tender",
-        summary: "Повна картка процедури: предмет, очікувана вартість, статус, документи.",
+        summary:
+          "Картка процедури: предмет, позиції, учасники, їхні пропозиції та переможець.",
+        status: "працює",
+        badges: ["source", "index"],
       },
       {
-        name: "proyav_list_tender_bids",
-        summary: "Учасники процедури та їхні цінові пропозиції, включно з відхиленими.",
-      },
-      {
-        name: "proyav_get_award",
-        summary: "Рішення про переможця: обґрунтування, дата, сума, скарги.",
-      },
-      {
-        name: "proyav_get_contract",
-        summary: "Договір за результатами торгів: сума, строк, додаткові угоди та зміни ціни.",
-      },
-      {
-        name: "proyav_get_plan",
-        summary: "Річний план закупівель замовника і його виконання.",
+        name: "proyav_recent_tenders",
+        summary: "Стрічка змін: що відбувається у закупівлях просто зараз.",
+        status: "працює",
+        badges: ["source"],
       },
     ],
   },
   {
-    id: "actors",
-    title: "Замовники та постачальники",
+    id: "index",
+    title: "Пошук по локальному індексу",
+    note: "Знімає обмеження джерела: стелю у 10 000 збігів і відсутність фільтрів за ЄДРПОУ та CPV.",
     tools: [
       {
-        name: "proyav_search_suppliers",
-        summary: "Пошук постачальника за назвою або кодом ЄДРПОУ.",
+        name: "proyav_search_index",
+        summary:
+          "Пошук з фільтрами за ЄДРПОУ замовника, кодом CPV, періодом і сумою. Враховує українську морфологію: «дорога» знаходить «доріг».",
+        status: "працює",
+        badges: ["index"],
       },
       {
-        name: "proyav_get_supplier_profile",
-        summary: "Історія участі фірми: перемоги, відсоток успіху, ключові замовники, суми.",
-        badges: ["cache"],
-      },
-      {
-        name: "proyav_get_buyer_profile",
-        summary: "Профіль замовника: обсяги закупівель, топ-постачальники, розподіл процедур.",
-        badges: ["cache"],
+        name: "proyav_index_status",
+        summary:
+          "Скільки процедур в індексі, за який період і яка частка вже має назву й суму.",
+        status: "працює",
+        badges: ["index"],
       },
     ],
   },
   {
     id: "analysis",
-    title: "Порівняння та агрегації",
-    note: "Ці tools рахують на нашому боці, щоб асистент не тягнув тисячі сторінок JSON у контекст.",
+    title: "Аналітика",
+    note: "Рахує на боці сервера, щоб асистент не тягнув тисячі карток у контекст. Разом із числами повертає покриття: неповний індекс дає занижені суми, і відповідь про це каже.",
     tools: [
       {
         name: "proyav_price_benchmark",
-        summary: "Ціна тендера проти схожих закупівель за period, регіоном і одиницею виміру.",
-        badges: ["cache"],
+        summary:
+          "Ціна процедури проти медіани схожих закупівель. Порівнює лише в межах однієї одиниці виміру і відмовляється рахувати, коли схожих менше восьми.",
+        status: "працює",
+        badges: ["index", "analysis"],
       },
       {
         name: "proyav_aggregate_spend",
-        summary: "Агрегати витрат за CPV, замовником, регіоном або періодом.",
-        badges: ["cache", "bulk"],
+        summary:
+          "Обсяги закупівель за замовниками, регіонами, кодами CPV або місяцями.",
+        status: "працює",
+        badges: ["index", "analysis"],
       },
       {
         name: "proyav_compare_buyers",
-        summary: "Порівняння кількох замовників за однаковим предметом закупівлі.",
-        badges: ["bulk"],
-      },
-      {
-        name: "proyav_export_dataset",
-        summary: "Вивантаження вибірки у CSV або JSON для подальшої роботи у файлі.",
-        badges: ["export"],
+        summary:
+          "Скільки різні замовники платили за той самий предмет: питання громади про сусідів.",
+        status: "працює",
+        badges: ["index", "analysis"],
       },
     ],
   },
   {
-    id: "declarations",
-    title: "Декларації НАЗК",
-    note: "Окремий сервер. Працює лише з тим, що суб'єкти декларування зобов'язані публікувати за законом.",
+    id: "planned",
+    title: "У роботі",
+    note: "Специфікація, а не працюючий API. Назви й аргументи можуть змінитись.",
     tools: [
-      {
-        name: "proyav_search_declarations",
-        summary: "Пошук декларацій за ПІБ, посадою, органом та роком.",
-        badges: ["cache"],
-      },
-      {
-        name: "proyav_get_declaration",
-        summary: "Повна декларація за ідентифікатором.",
-      },
-      {
-        name: "proyav_get_declarant_profile",
-        summary: "Усі подані декларації однієї особи з посадами по роках.",
-      },
-      {
-        name: "proyav_list_declaration_assets",
-        summary: "Нерухомість, транспорт, цінне майно з декларації.",
-      },
-      {
-        name: "proyav_list_declaration_income",
-        summary: "Доходи, подарунки, готівка та банківські активи.",
-      },
-      {
-        name: "proyav_list_corporate_rights",
-        summary: "Корпоративні права та бенефіціарна власність декларанта.",
-      },
-      {
-        name: "proyav_diff_declarations",
-        summary: "Порівняння двох років однієї особи: що з'явилось, зникло або змінилось у сумі.",
-      },
-    ],
-  },
-  {
-    id: "registry",
-    title: "Юридичні особи ЄДР",
-    tools: [
-      {
-        name: "proyav_search_entities",
-        summary: "Пошук юрособи або ФОП за назвою, кодом чи адресою.",
-      },
-      {
-        name: "proyav_get_entity",
-        summary: "Картка юрособи: статус, КВЕДи, адреса, статутний капітал.",
-      },
-      {
-        name: "proyav_list_entity_officers",
-        summary: "Керівники, засновники та бенефіціари з датами змін.",
-      },
       {
         name: "proyav_find_connections",
         summary:
-          "Спільні засновники, керівники та адреси між кількома компаніями. Повертає ребра графа, а не висновок.",
-        badges: ["bulk"],
+          "Спільні засновники, керівники та адреси між учасниками торгів. Працюватиме лише для завершених процедур: до визначення переможця учасники не розкриваються.",
+        status: "у планах",
+      },
+      {
+        name: "proyav_get_supplier_profile",
+        summary:
+          "Історія участі фірми: перемоги, відсоток успіху, ключові замовники.",
+        status: "у планах",
+      },
+      {
+        name: "proyav_search_declarations",
+        summary: "Декларації НАЗК. Окремий сервер, потребує правової рамки перед кодом.",
+        status: "у планах",
+      },
+      {
+        name: "proyav_search_entities",
+        summary: "Реєстр юридичних осіб ЄДР: засновники, керівники, звʼязки.",
+        status: "у планах",
       },
     ],
   },
 ];
 
-export const TOOL_COUNT = TOOL_GROUPS.reduce((n, g) => n + g.tools.length, 0);
+export const WORKING_COUNT = TOOL_GROUPS.flatMap((g) => g.tools).filter(
+  (t) => t.status === "працює",
+).length;
+
+export const PLANNED_COUNT = TOOL_GROUPS.flatMap((g) => g.tools).filter(
+  (t) => t.status === "у планах",
+).length;
+
+export const TOOL_COUNT = WORKING_COUNT + PLANNED_COUNT;

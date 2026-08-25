@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowLeft, Database, Layers, ShieldCheck } from "lucide-
 import { CodeBlock } from "../components/CodeBlock";
 import { LiquidMetalButton } from "../components/LiquidMetalButton";
 import { Mark } from "../components/Mark";
-import { TOOL_COUNT, TOOL_GROUPS } from "./tools";
+import { PLANNED_COUNT, TOOL_GROUPS, WORKING_COUNT } from "./tools";
 import { HOME } from "../lib/paths";
 
 const SECTIONS = [
@@ -12,7 +12,7 @@ const SECTIONS = [
   { id: "clients", label: "Підключення клієнтів" },
   { id: "sdk", label: "SDK" },
   { id: "access", label: "Доступ і ліміти" },
-  { id: "tools", label: `Доступні tools (${TOOL_COUNT})` },
+  { id: "tools", label: `Доступні tools (${WORKING_COUNT})` },
   { id: "scenarios", label: "Типові сценарії" },
   { id: "errors", label: "Помилки та обмеження" },
   { id: "faq", label: "FAQ" },
@@ -22,9 +22,15 @@ const H2 = "font-display text-[clamp(23px,2.6vw,32px)] leading-[1.15] font-mediu
 const P = "mt-4 max-w-[70ch] text-[16px] leading-relaxed text-dim";
 
 const BADGE: Record<string, { label: string; title: string }> = {
-  cache: { label: "cache", title: "Відповідає з локального індексу, без звернення до джерела" },
-  bulk: { label: "bulk", title: "Обробляє кілька об'єктів за один виклик" },
-  export: { label: "export", title: "Повертає файл або посилання на вивантаження" },
+  source: {
+    label: "джерело",
+    title: "Працює напряму з Prozorro, локальний індекс не потрібен",
+  },
+  index: { label: "індекс", title: "Читає локальний індекс" },
+  analysis: {
+    label: "аналітика",
+    title: "Рахує на боці сервера і повертає покриття вибірки",
+  },
 };
 
 function useScrollSpy(ids: string[]) {
@@ -84,7 +90,7 @@ export default function DocsApp() {
         <div className="mx-auto max-w-[1240px] px-5 py-16 sm:px-8 sm:py-20">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 font-mono text-[11.5px] tracking-wide text-amber-200">
             <AlertTriangle className="size-3.5" strokeWidth={2} />
-            ЧЕРНЕТКА СПЕЦИФІКАЦІЇ, СЕРВЕРИ ЩЕ НЕ ОПУБЛІКОВАНІ
+            СЕРВЕР ПРАЦЮЄ, АЛЕ ЩЕ НЕ ОПУБЛІКОВАНИЙ ПУБЛІЧНО
           </div>
 
           <h1 className="max-w-[20ch] font-display text-[clamp(30px,4.6vw,54px)] leading-[1.06] font-medium tracking-[-0.04em]">
@@ -100,7 +106,7 @@ export default function DocsApp() {
             {[
               ["ТРАНСПОРТ", "stdio та Streamable HTTP"],
               ["АВТОРИЗАЦІЯ", "не потрібна"],
-              ["TOOLS", `${TOOL_COUNT} у чернетці`],
+              ["TOOLS", `${WORKING_COUNT} працюють`],
               ["ДАНІ", "з 2015 року"],
             ].map(([k, v]) => (
               <div key={k}>
@@ -352,11 +358,13 @@ const result = await streamText({
           </section>
 
           <section id="tools" className="scroll-mt-24">
-            <h2 className={H2}>Доступні tools ({TOOL_COUNT})</h2>
+            <h2 className={H2}>Доступні tools</h2>
             <p className={P}>
-              Перелік нижче це проєктована поверхня серверів. Точні назви, аргументи та JSON Schema
-              завжди повертає сам сервер: читайте <code className="font-mono text-accent-soft">tools/list</code> на
-              старті агента, це стандартна MCP-практика.
+              {WORKING_COUNT} інструментів працюють сьогодні, ще {PLANNED_COUNT} у роботі.
+              Кожен рядок помічений, тому видно, на що можна спиратись, а що поки специфікація.
+              Точні назви, аргументи та JSON Schema завжди повертає сам сервер: читайте{" "}
+              <code className="font-mono text-accent-soft">tools/list</code> на старті агента,
+              це стандартна MCP-практика.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -390,7 +398,22 @@ const result = await streamText({
                         className="flex flex-col gap-2 p-5 transition-colors hover:bg-white/[0.025] sm:flex-row sm:items-baseline sm:gap-6"
                       >
                         <div className="flex shrink-0 flex-wrap items-center gap-2 sm:w-[290px]">
-                          <code className="font-mono text-[13px] text-fg">{tool.name}</code>
+                          <code
+                            className={`font-mono text-[13px] ${
+                              tool.status === "працює" ? "text-fg" : "text-dim"
+                            }`}
+                          >
+                            {tool.name}
+                          </code>
+                          <span
+                            className={`rounded border px-1.5 py-0.5 font-mono text-[10.5px] ${
+                              tool.status === "працює"
+                                ? "border-emerald-400/40 text-emerald-300"
+                                : "border-line text-dim"
+                            }`}
+                          >
+                            {tool.status}
+                          </span>
                           {tool.badges?.map((b) => (
                             <span
                               key={b}

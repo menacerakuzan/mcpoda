@@ -35,8 +35,13 @@ try {
   const client = new Client({ name: "smoke-http", version: "1" });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`)));
 
+  // Checking a count means the test breaks every time a tool is added, which
+  // teaches people to bump the number instead of reading the failure.
   const { tools } = await client.listTools();
-  check(tools.length === 5, `${tools.length} інструментів через HTTP`);
+  const names = new Set(tools.map((t) => t.name));
+  const required = ["proyav_search_tenders", "proyav_get_tender", "proyav_index_status"];
+  const missing = required.filter((n) => !names.has(n));
+  check(missing.length === 0, `інструменти на місці (${tools.length}), бракує: ${missing.join(", ") || "нічого"}`);
 
   const result = await client.callTool({
     name: "proyav_search_tenders",
@@ -59,8 +64,8 @@ try {
   }
   check(codes.includes(429), `обмеження частоти спрацювало: ${codes.join(",")}`);
 
-  const missing = await fetch(`${base}/nowhere`);
-  check(missing.status === 404, "невідомий шлях віддає 404");
+  const unknownPath = await fetch(`${base}/nowhere`);
+  check(unknownPath.status === 404, "невідомий шлях віддає 404");
 } finally {
   child.kill();
 }
