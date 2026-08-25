@@ -1,8 +1,9 @@
 name: Deploy site
 
+# The site ships through Vercel. This workflow stays for the case where GitHub
+# Pages is wanted instead, but it is manual: on push it only fails, because
+# Pages is not enabled for the repository.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
