@@ -50,7 +50,8 @@ export async function searchTenders(
 ): Promise<SearchResponse> {
   const body: Record<string, unknown> = {
     text: query.text,
-    // the validator demands page >= 1 even though responses report page 0
+    // paging is 1-based: the validator rejects 0, and the response echoes back
+    // whatever page was asked for
     page: Math.max(query.page ?? 1, 1),
   };
   if (query.status?.length) body.status = query.status;

@@ -6,7 +6,9 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "prepare": "tsc",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "test": "npm run build && node --test test/unit.test.ts",
+    "test:contract": "npm run build && node --test test/contract.test.ts"
   },
   "author": "",
   "license": "MIT",

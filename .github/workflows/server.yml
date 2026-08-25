@@ -1,0 +1,54 @@
+name: MCP servers
+
+on:
+  push:
+    branches: [main]
+    paths: ["servers/**", ".github/workflows/server.yml"]
+  pull_request:
+    paths: ["servers/**"]
+  schedule:
+    # The sources are undocumented and can change without warning. A daily run
+    # turns "the assistant suddenly finds nothing" into a failed job we can read.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Збірка і юніт-тести
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: servers/prozorro
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: servers/prozorro/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  contract:
+    name: Контрактні тести по живих джерелах
+    # Pull requests from forks would hammer a government service, so live checks
+    # run on our own pushes and on the schedule only.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: servers/prozorro
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: servers/prozorro/package-lock.json
+      - run: npm ci
+      - run: npm run test:contract
+      - name: Смоук через MCP-клієнт
+        run: npm run smoke
