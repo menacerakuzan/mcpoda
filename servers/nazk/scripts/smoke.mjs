@@ -13,6 +13,17 @@ const { tools } = await c.listTools();
 console.log("інструменти:", tools.map((t) => t.name).join(", "));
 
 const search = await call("proyav_search_declarations", { query: "Петренко", year: 2024 });
+
+// The register answers from Ukrainian addresses and returns 403 elsewhere, so a
+// smoke run on a foreign machine says so and stops instead of crashing on an
+// empty result.
+if (search.d.error || !search.d.results?.length) {
+  console.log(`\nреєстр недоступний з цієї машини: ${search.d.message ?? "порожня видача"}`);
+  console.log("З адрес за межами України він відповідає 403. Смоук пропущено.");
+  await c.close();
+  process.exit(0);
+}
+
 console.log(`\nпошук: ${search.d.totalMatches} збігів, показано ${search.d.returned} (${search.ms} мс)`);
 search.d.results.slice(0, 3).forEach((r) =>
   console.log(`   ${r.name} — ${(r.position ?? "?").slice(0, 34)} | ${r.year} | ${r.type}`),
