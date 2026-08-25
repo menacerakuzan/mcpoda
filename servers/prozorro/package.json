@@ -10,7 +10,9 @@
     "test": "npm run build && node --test test/unit.test.ts test/resolve.test.ts test/normalize.test.ts test/index.test.ts",
     "test:contract": "npm run build && node --test test/contract.test.ts",
     "crawl": "npm run build && node dist/cli.js crawl",
-    "index:stats": "node dist/cli.js stats"
+    "index:stats": "node dist/cli.js stats",
+    "serve": "npm run build && node dist/serve.js",
+    "smoke:http": "npm run build && node scripts/smoke-http.mjs"
   },
   "author": "",
   "license": "MIT",
@@ -24,7 +26,8 @@
     "typescript": "^7.0.2"
   },
   "bin": {
-    "proyav-prozorro": "dist/index.js"
+    "proyav-prozorro": "dist/index.js",
+    "proyav-prozorro-serve": "dist/serve.js"
   },
   "files": [
     "dist"
