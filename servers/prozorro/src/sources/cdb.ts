@@ -59,7 +59,11 @@ export type Tender = Record<string, unknown> & {
   title?: string;
   description?: string;
   status?: string;
-  value?: { amount?: number; currency?: string; valueAddedTaxIncluded?: boolean };
+  value?: {
+    amount?: number;
+    currency?: string;
+    valueAddedTaxIncluded?: boolean;
+  };
   procurementMethodType?: string;
   dateModified?: string;
   tenderPeriod?: { startDate?: string; endDate?: string };
@@ -73,7 +77,9 @@ export type Tender = Record<string, unknown> & {
 };
 
 export async function fetchTender(uuid: string): Promise<Tender> {
-  const { data } = await requestJson<{ data: Tender }>(`${CDB_BASE}/tenders/${uuid}`);
+  const { data } = await requestJson<{ data: Tender }>(
+    `${CDB_BASE}/tenders/${uuid}`,
+  );
   return data;
 }
 

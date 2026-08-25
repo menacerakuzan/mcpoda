@@ -21,9 +21,10 @@ async function guard<T>(run: () => Promise<T>) {
     return asJsonContent({
       error: isSource ? `source_${error.status}` : "unexpected",
       message: error instanceof Error ? error.message : String(error),
-      hint: isSource && error.status === 429
-        ? "Джерело обмежує частоту. Зачекайте кілька секунд і повторіть запит."
-        : undefined,
+      hint:
+        isSource && error.status === 429
+          ? "Джерело обмежує частоту. Зачекайте кілька секунд і повторіть запит."
+          : undefined,
     });
   }
 }
@@ -62,8 +63,14 @@ export function registerTools(server: McpServer) {
           .describe(
             "Назва області для фільтрації, наприклад «Одеська область». Порівняння без урахування регістру.",
           ),
-        minValue: z.number().optional().describe("Мінімальна очікувана вартість, грн."),
-        maxValue: z.number().optional().describe("Максимальна очікувана вартість, грн."),
+        minValue: z
+          .number()
+          .optional()
+          .describe("Мінімальна очікувана вартість, грн."),
+        maxValue: z
+          .number()
+          .optional()
+          .describe("Максимальна очікувана вартість, грн."),
         page: z.number().int().min(1).optional().describe("Сторінка, від 1."),
         perPage: z
           .number()
@@ -76,34 +83,38 @@ export function registerTools(server: McpServer) {
     },
     async ({ text, status, region, minValue, maxValue, page, perPage }) =>
       guard(async () => {
-      const response = await searchTenders({ text, status, page, perPage });
+        const response = await searchTenders({ text, status, page, perPage });
 
-      let hits = response.data.map(projectHit);
-      const beforeFilters = hits.length;
+        // keep the raw hit next to its projection: filtering the projections
+        // alone would drift the indexes apart from the source records
+        let rows = response.data.map((hit) => ({ hit, card: projectHit(hit) }));
+        const received = rows.length;
 
-      if (region) {
-        const needle = region.toLowerCase();
-        hits = hits.filter((h) => h.buyer.region?.toLowerCase().includes(needle));
-      }
-      if (minValue !== undefined || maxValue !== undefined) {
-        hits = hits.filter((h, i) => {
-          const amount = response.data[i]?.value?.amount;
-          if (amount === undefined) return false;
-          if (minValue !== undefined && amount < minValue) return false;
-          if (maxValue !== undefined && amount > maxValue) return false;
-          return true;
-        });
-      }
+        if (region) {
+          const needle = region.toLowerCase();
+          rows = rows.filter((row) =>
+            row.card.buyer.region?.toLowerCase().includes(needle),
+          );
+        }
+        if (minValue !== undefined || maxValue !== undefined) {
+          rows = rows.filter(({ hit }) => {
+            const amount = hit.value?.amount;
+            if (amount === undefined) return false;
+            if (minValue !== undefined && amount < minValue) return false;
+            if (maxValue !== undefined && amount > maxValue) return false;
+            return true;
+          });
+        }
 
-      return asJsonContent({
-        query: { text, status, region, minValue, maxValue },
-        page: response.page,
-        perPage: response.per_page,
-        totalMatches: response.total,
-        returned: hits.length,
-        filteredOutOnThisPage: beforeFilters - hits.length,
-        results: hits,
-        source: SOURCE_NOTE,
+        return asJsonContent({
+          query: { text, status, region, minValue, maxValue },
+          page: response.page,
+          perPage: response.per_page,
+          totalMatches: response.total,
+          returned: rows.length,
+          filteredOutOnThisPage: received - rows.length,
+          results: rows.map((row) => row.card),
+          source: SOURCE_NOTE,
         });
       }),
   );
@@ -127,31 +138,37 @@ export function registerTools(server: McpServer) {
         id: z
           .string()
           .min(4)
-          .describe("Ідентифікатор CDB або номер процедури UA-РРРР-ММ-ДД-NNNNNN-a."),
+          .describe(
+            "Ідентифікатор CDB або номер процедури UA-РРРР-ММ-ДД-NNNNNN-a.",
+          ),
         full: z
           .boolean()
           .optional()
-          .describe("Повернути сирий запис замість вижимки. За замовчуванням false."),
+          .describe(
+            "Повернути сирий запис замість вижимки. За замовчуванням false.",
+          ),
       },
     },
     async ({ id, full }) =>
       guard(async () => {
-      const uuid = /^[0-9a-f]{32}$/i.test(id) ? id : await resolveTenderId(id);
+        const uuid = /^[0-9a-f]{32}$/i.test(id)
+          ? id
+          : await resolveTenderId(id);
 
-      if (!uuid) {
-        return asJsonContent({
-          error: "not_found",
-          message: [
-            `Не вдалося знайти процедуру ${id} у стрічці змін за розумний час.`,
-            "Стрічка впорядкована за датою останньої зміни, тому давні процедури можуть лежати далеко",
-            "від дати свого створення. Спробуйте proyav_search_tenders, щоб перевірити номер,",
-            "або відкрийте сторінку процедури вручну.",
-          ].join(" "),
-          webUrl: tenderWebUrl(id),
-        });
-      }
+        if (!uuid) {
+          return asJsonContent({
+            error: "not_found",
+            message: [
+              `Не вдалося знайти процедуру ${id} у стрічці змін за розумний час.`,
+              "Стрічка впорядкована за датою останньої зміни, тому давні процедури можуть лежати далеко",
+              "від дати свого створення. Спробуйте proyav_search_tenders, щоб перевірити номер,",
+              "або відкрийте сторінку процедури вручну.",
+            ].join(" "),
+            webUrl: tenderWebUrl(id),
+          });
+        }
 
-      const tender = await fetchTender(uuid);
+        const tender = await fetchTender(uuid);
         return asJsonContent(
           full
             ? { raw: tender, source: SOURCE_NOTE }
@@ -194,35 +211,38 @@ export function registerTools(server: McpServer) {
     },
     async ({ limit, edrpou, since }) =>
       guard(async () => {
-      const page = await fetchFeedPage({
-        limit: limit ?? 100,
-        descending: !since,
-        offset: since,
-      });
+        const page = await fetchFeedPage({
+          limit: limit ?? 100,
+          descending: !since,
+          offset: since,
+        });
 
-      const entries = page.data
-        .filter((entry) => !edrpou || entry.procuringEntity?.identifier?.id === edrpou)
-        .map((entry) => ({
-          id: entry.id,
-          tenderID: entry.tenderID,
-          status: entry.status,
-          procedure: entry.procurementMethodType,
-          dateModified: entry.dateModified,
-          buyer: {
-            name: entry.procuringEntity?.name,
-            edrpou: entry.procuringEntity?.identifier?.id,
-            region: entry.procuringEntity?.address?.region,
-          },
-          url: entry.tenderID ? tenderWebUrl(entry.tenderID) : undefined,
-        }));
+        const entries = page.data
+          .filter(
+            (entry) =>
+              !edrpou || entry.procuringEntity?.identifier?.id === edrpou,
+          )
+          .map((entry) => ({
+            id: entry.id,
+            tenderID: entry.tenderID,
+            status: entry.status,
+            procedure: entry.procurementMethodType,
+            dateModified: entry.dateModified,
+            buyer: {
+              name: entry.procuringEntity?.name,
+              edrpou: entry.procuringEntity?.identifier?.id,
+              region: entry.procuringEntity?.address?.region,
+            },
+            url: entry.tenderID ? tenderWebUrl(entry.tenderID) : undefined,
+          }));
 
-      return asJsonContent({
-        order: since ? "від вказаної дати вперед" : "найновіші першими",
-        returned: entries.length,
-        scanned: page.data.length,
-        nextOffset: page.next_page?.offset,
-        entries,
-        source: SOURCE_NOTE,
+        return asJsonContent({
+          order: since ? "від вказаної дати вперед" : "найновіші першими",
+          returned: entries.length,
+          scanned: page.data.length,
+          nextOffset: page.next_page?.offset,
+          entries,
+          source: SOURCE_NOTE,
         });
       }),
   );

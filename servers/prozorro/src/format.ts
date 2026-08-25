@@ -3,9 +3,9 @@ import { tenderWebUrl, type Tender } from "./sources/cdb.js";
 
 export function money(value?: { amount?: number; currency?: string }) {
   if (!value?.amount && value?.amount !== 0) return null;
-  const amount = new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 2 }).format(
-    value.amount,
-  );
+  const amount = new Intl.NumberFormat("uk-UA", {
+    maximumFractionDigits: 2,
+  }).format(value.amount);
   return `${amount} ${value.currency ?? "UAH"}`;
 }
 
@@ -21,7 +21,8 @@ export function projectHit(hit: SearchHit) {
     status: hit.status,
     value: money(hit.value),
     buyer: {
-      name: hit.procuringEntity?.name ?? hit.procuringEntity?.identifier?.legalName,
+      name:
+        hit.procuringEntity?.name ?? hit.procuringEntity?.identifier?.legalName,
       edrpou: hit.procuringEntity?.identifier?.id,
       region: hit.procuringEntity?.address?.region,
       locality: hit.procuringEntity?.address?.locality,
@@ -34,7 +35,10 @@ type Award = {
   status?: string;
   value?: { amount?: number; currency?: string };
   date?: string;
-  suppliers?: Array<{ name?: string; identifier?: { id?: string; legalName?: string } }>;
+  suppliers?: Array<{
+    name?: string;
+    identifier?: { id?: string; legalName?: string };
+  }>;
 };
 
 type Bid = {
@@ -59,7 +63,8 @@ export function projectTender(tender: Tender) {
   const items = (tender.items as Item[] | undefined) ?? [];
   const awards = (tender.awards as Award[] | undefined) ?? [];
   const bids = (tender.bids as Bid[] | undefined) ?? [];
-  const contracts = (tender.contracts as Array<Record<string, unknown>> | undefined) ?? [];
+  const contracts =
+    (tender.contracts as Array<Record<string, unknown>> | undefined) ?? [];
 
   const winners = awards
     .filter((a) => a.status === "active")
@@ -86,7 +91,10 @@ export function projectTender(tender: Tender) {
     },
     buyer: projectEntity(tender.procuringEntity),
     classification: items[0]?.classification
-      ? { cpv: items[0].classification.id, description: items[0].classification.description }
+      ? {
+          cpv: items[0].classification.id,
+          description: items[0].classification.description,
+        }
       : undefined,
     items: items.slice(0, 10).map((item) => ({
       description: item.description?.trim()?.slice(0, 200),
@@ -107,7 +115,8 @@ export function projectTender(tender: Tender) {
       awards: awards.length,
       contracts: contracts.length,
       documents: (tender.documents as unknown[] | undefined)?.length ?? 0,
-      cancellations: (tender.cancellations as unknown[] | undefined)?.length ?? 0,
+      cancellations:
+        (tender.cancellations as unknown[] | undefined)?.length ?? 0,
     },
     dateModified: tender.dateModified,
     url: tender.tenderID ? tenderWebUrl(tender.tenderID) : undefined,
@@ -138,6 +147,8 @@ function projectEntity(entity: unknown) {
 /** Tool results travel as text, so everything is serialised in one place. */
 export function asJsonContent(payload: unknown) {
   return {
-    content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+    content: [
+      { type: "text" as const, text: JSON.stringify(payload, null, 2) },
+    ],
   };
 }

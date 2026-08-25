@@ -39,7 +39,11 @@ export async function requestJson<T>(
     });
   } catch (error) {
     if (error instanceof Error && error.name === "TimeoutError") {
-      throw new SourceError(408, url, `Джерело не відповіло за ${TIMEOUT_MS} мс`);
+      throw new SourceError(
+        408,
+        url,
+        `Джерело не відповіло за ${TIMEOUT_MS} мс`,
+      );
     }
     throw error;
   }

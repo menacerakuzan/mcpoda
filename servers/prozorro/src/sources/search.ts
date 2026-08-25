@@ -12,7 +12,11 @@ export type SearchHit = {
   tenderID: string;
   title: string;
   status: string;
-  value?: { amount?: number; currency?: string; valueAddedTaxIncluded?: boolean };
+  value?: {
+    amount?: number;
+    currency?: string;
+    valueAddedTaxIncluded?: boolean;
+  };
   procuringEntity?: {
     name?: string;
     kind?: string;
@@ -35,7 +39,9 @@ export type SearchQuery = {
   perPage?: number;
 };
 
-export async function searchTenders(query: SearchQuery): Promise<SearchResponse> {
+export async function searchTenders(
+  query: SearchQuery,
+): Promise<SearchResponse> {
   const body: Record<string, unknown> = {
     text: query.text,
     per_page: Math.min(Math.max(query.perPage ?? 20, 1), 100),
