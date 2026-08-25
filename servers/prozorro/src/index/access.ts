@@ -9,6 +9,7 @@ import {
 } from "./db.js";
 import { lookupByTenderId, searchIndex, type IndexSearch } from "./queries.js";
 import { benchmark } from "../analysis/benchmark.js";
+import { aggregate, compareBuyers } from "../analysis/aggregate.js";
 
 /**
  * The index is optional. A person who has just installed the server has no
@@ -28,6 +29,10 @@ export type Index = {
   stats(): IndexStats;
   lookup(tenderID: string): ReturnType<typeof lookupByTenderId>;
   benchmark(options: Parameters<typeof benchmark>[1]): ReturnType<typeof benchmark>;
+  aggregate(options: Parameters<typeof aggregate>[1]): ReturnType<typeof aggregate>;
+  compareBuyers(
+    options: Parameters<typeof compareBuyers>[1],
+  ): ReturnType<typeof compareBuyers>;
   search(query: IndexSearch): ReturnType<typeof searchIndex>;
   close(): void;
 };
@@ -58,6 +63,8 @@ export function getIndex(): Index | null {
     stats: () => indexStats(db),
     lookup: (tenderID) => lookupByTenderId(db, tenderID),
     benchmark: (options) => benchmark(db, options),
+    aggregate: (options) => aggregate(db, options),
+    compareBuyers: (options) => compareBuyers(db, options),
     search: (query) => searchIndex(db, query),
     close: () => db.close(),
   };

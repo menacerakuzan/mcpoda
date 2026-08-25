@@ -13,6 +13,12 @@ import {
   type SearchHit,
 } from "../sources/search.js";
 
+const NO_INDEX = {
+  error: "no_index",
+  message:
+    "Цей інструмент працює по локальному індексу, а його немає. Побудувати: npx proyav-prozorro crawl --recent, далі npx proyav-prozorro enrich.",
+};
+
 const SOURCE_NOTE =
   "Джерело: відкриті дані Prozorro. Сервер лише читає, нічого не змінює в реєстрі.";
 
@@ -395,6 +401,78 @@ export function registerTools(server: McpServer) {
           });
         }
         return asJsonContent({ ...result, source: SOURCE_NOTE });
+      }),
+  );
+
+  server.registerTool(
+    "proyav_aggregate_spend",
+    {
+      title: "Обсяги закупівель",
+      description: [
+        "Сумує закупівлі за обраним розрізом: замовники, регіони, коди CPV, місяці або статуси.",
+        "Це відповідь на питання про масштаб: скільки і на що йде.",
+        "",
+        "Працює по локальному індексу, тому у відповіді завжди є покриття: скільки процедур",
+        "у вибірці вже мають суму. Якщо покриття низьке, цифра є нижньою межею, а не повною сумою,",
+        "і так про це і треба казати людині.",
+        "",
+        "Суми це очікувана вартість, а не сплачені кошти.",
+      ].join("\n"),
+      inputSchema: {
+        dimension: z
+          .enum(["buyer", "region", "cpv", "month", "status"])
+          .describe("Розріз: buyer — замовники, region — області, cpv — коди, month — місяці."),
+        from: z.string().optional().describe("Дата від, РРРР-ММ-ДД."),
+        to: z.string().optional().describe("Дата до, РРРР-ММ-ДД."),
+        region: z.string().optional().describe("Частина назви області."),
+        buyerEdrpou: z.string().optional().describe("Код ЄДРПОУ замовника."),
+        cpvPrefix: z.string().optional().describe("Початок коду CPV."),
+        status: z.array(z.enum(TENDER_STATUSES)).optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      },
+    },
+    async (args) =>
+      guard(async () => {
+        const index = getIndex();
+        if (!index) return asJsonContent(NO_INDEX);
+        return asJsonContent({ ...index.aggregate(args), source: SOURCE_NOTE });
+      }),
+  );
+
+  server.registerTool(
+    "proyav_compare_buyers",
+    {
+      title: "Порівняння замовників",
+      description: [
+        "Скільки різні замовники платили за той самий предмет. Це питання громади,",
+        "яка хоче знати, чи не переплачує проти сусідів.",
+        "",
+        "Обовʼязково вказуйте unit, якщо він відомий: без нього порівнюються загальні суми,",
+        "а обсяг у різних замовників відрізняється в рази, і порівняння виходить грубим.",
+        "Одиницю можна дізнатись із картки процедури або з proyav_search_index.",
+        "",
+        "Один замовник з однією процедурою це не показник: дивіться на кількість процедур.",
+      ].join("\n"),
+      inputSchema: {
+        cpv: z
+          .string()
+          .min(2)
+          .describe("Код CPV або його початок, наприклад 03220000-9 або 4523."),
+        unit: z
+          .string()
+          .optional()
+          .describe("Одиниця виміру, наприклад «кілограм». Тоді порівняння йде за ціною одиниці."),
+        from: z.string().optional().describe("Дата від, РРРР-ММ-ДД."),
+        to: z.string().optional().describe("Дата до, РРРР-ММ-ДД."),
+        region: z.string().optional().describe("Обмежити областю."),
+        limit: z.number().int().min(1).max(100).optional(),
+      },
+    },
+    async (args) =>
+      guard(async () => {
+        const index = getIndex();
+        if (!index) return asJsonContent(NO_INDEX);
+        return asJsonContent({ ...index.compareBuyers(args), source: SOURCE_NOTE });
       }),
   );
 

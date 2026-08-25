@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { searchTenders, SOURCE_PAGE_SIZE } from "../dist/sources/search.js";
-import { fetchFeedPage, fetchTender } from "../dist/sources/cdb.js";
-import { requestJson } from "../dist/http.js";
+import { searchTenders, SOURCE_PAGE_SIZE } from "../../dist/sources/search.js";
+import { fetchFeedPage, fetchTender } from "../../dist/sources/cdb.js";
+import { requestJson } from "../../dist/http.js";
 
 const SEARCH_URL = "https://prozorro.gov.ua/api/search/tenders";
 
@@ -26,6 +26,9 @@ const rawSearch = (body: Record<string, unknown>) =>
  * and specific: the alternative is the server quietly returning nothing and the
  * assistant telling a person there are no procurements, which is the worst
  * possible outcome for a transparency tool.
+ *
+ * They live apart from the rest on purpose: `npm test` must stay green when a
+ * source is down, so nothing under test/ except this folder touches the network.
  *
  * Run: npm run test:contract
  */
@@ -166,12 +169,27 @@ describe("стрічка змін CDB", { timeout: TIMEOUT }, () => {
   });
 
   it("іде у зворотному порядку з descending", async () => {
-    const page = await fetchFeedPage({ limit: 10, descending: true });
+    // The order is not strictly monotonic: records sharing a second come back
+    // swapped, because the feed is ordered by its own cursor rather than by the
+    // timestamp alone. Harmless for us — the crawler follows the cursor and the
+    // resolver only checks whether a page has fallen behind a date — but a strict
+    // assertion here is flaky, and a flaky test teaches people to ignore red.
+    const page = await fetchFeedPage({ limit: 200, descending: true });
     const dates = page.data.map((entry) => new Date(entry.dateModified).getTime());
 
+    const tolerance = 5_000;
     for (let i = 1; i < dates.length; i++) {
-      assert.ok(dates[i] <= dates[i - 1], "порядок у descending порушено");
+      assert.ok(
+        dates[i]! <= dates[i - 1]! + tolerance,
+        `порядок у descending порушено більш ніж на ${tolerance} мс: ${page.data[i - 1]?.dateModified} перед ${page.data[i]?.dateModified}`,
+      );
     }
+
+    // The page as a whole must still move backwards in time.
+    assert.ok(
+      dates[dates.length - 1]! < dates[0]!,
+      "сторінка descending не рухається у минуле",
+    );
   });
 
   it("інлайнить лише дозволені поля і ніколи title чи value", async () => {
