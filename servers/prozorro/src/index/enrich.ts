@@ -3,6 +3,7 @@ import { fetchTender } from "../sources/cdb.js";
 import { normalizeText } from "./normalize.js";
 import { pendingEnrichment } from "./queries.js";
 import { toEpoch } from "./db.js";
+import { summariseUnits, type Items } from "./units.js";
 
 /**
  * The feed never carries a title, an amount or a CPV code, so a second pass
@@ -42,6 +43,9 @@ update tenders set
   value_amount   = ?,
   value_currency = ?,
   cpv            = ?,
+  unit           = ?,
+  quantity       = ?,
+  unit_kind      = ?,
   status         = coalesce(?, status),
   enriched_at    = ?
 where id = ?
@@ -72,8 +76,8 @@ export async function enrich(
       const tender = await fetch(row.id);
       const title =
         typeof tender.title === "string" ? tender.title.trim() : null;
-      const items =
-        (tender.items as Array<{ classification?: { id?: string } }>) ?? [];
+      const items = (tender.items as Items & Array<{ classification?: { id?: string } }>) ?? [];
+      const units = summariseUnits(items);
 
       update.run(
         title,
@@ -81,6 +85,9 @@ export async function enrich(
         tender.value?.amount ?? null,
         tender.value?.currency ?? null,
         items[0]?.classification?.id ?? null,
+        units.unit,
+        units.quantity,
+        units.kind,
         tender.status ?? null,
         toEpoch(new Date().toISOString()),
         row.id,

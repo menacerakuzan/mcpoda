@@ -7,7 +7,7 @@
     "dev": "tsc --watch",
     "prepare": "tsc",
     "smoke": "node scripts/smoke.mjs",
-    "test": "npm run build && node --test test/unit.test.ts test/resolve.test.ts test/normalize.test.ts test/index.test.ts",
+    "test": "npm run build && node --test test/unit.test.ts test/resolve.test.ts test/normalize.test.ts test/index.test.ts test/benchmark.test.ts",
     "test:contract": "npm run build && node --test test/contract.test.ts",
     "crawl": "npm run build && node dist/cli.js crawl",
     "index:stats": "node dist/cli.js stats",

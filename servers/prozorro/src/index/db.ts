@@ -16,7 +16,7 @@ export function databasePath() {
  * mismatch is answered by rebuilding rather than by migration code that would
  * have to stay correct forever.
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /**
  * Two decisions here were made by measuring 200 000 real rows, because at twenty
@@ -53,6 +53,9 @@ create table if not exists tenders (
   value_amount    real,
   value_currency  text,
   cpv             text,
+  unit            text,
+  quantity        real,
+  unit_kind       text,
   enriched_at     integer
 );
 
@@ -114,7 +117,7 @@ export function openDatabase(path = databasePath()) {
 
   if (tableExists(db, "tenders")) {
     const version = Number(readState(db, "schema_version") ?? 1);
-    if (version !== SCHEMA_VERSION) {
+    if (version !== SCHEMA_VERSION && !upgrade(db, version)) {
       db.close();
       throw new SchemaMismatch(version);
     }
@@ -123,6 +126,35 @@ export function openDatabase(path = databasePath()) {
   db.exec(SCHEMA);
   writeState(db, "schema_version", String(SCHEMA_VERSION));
   return db;
+}
+
+/**
+ * Adding columns is not a reason to make someone re-crawl for hours: the old
+ * rows stay valid and the new fields simply fill in on the next enrichment pass.
+ * A change that rearranges existing data would still be answered by a rebuild.
+ */
+function upgrade(db: DatabaseSync, from: number) {
+  if (from !== 2 || SCHEMA_VERSION !== 3) return false;
+
+  const columns = new Set(
+    (db.prepare("select name from pragma_table_info('tenders')").all() as Array<{
+      name: string;
+    }>).map((row) => row.name),
+  );
+
+  for (const [name, type] of [
+    ["unit", "text"],
+    ["quantity", "real"],
+    ["unit_kind", "text"],
+  ] as const) {
+    if (!columns.has(name)) db.exec(`alter table tenders add column ${name} ${type}`);
+  }
+
+  // The new fields are empty for everything indexed so far, so those procedures
+  // go back into the enrichment queue rather than pretending to be complete.
+  db.exec("update tenders set enriched_at = null where unit is null and enriched_at is not null");
+  writeState(db, "schema_version", String(SCHEMA_VERSION));
+  return true;
 }
 
 function tableExists(db: DatabaseSync, name: string) {

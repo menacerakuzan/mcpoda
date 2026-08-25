@@ -5,6 +5,7 @@ import { SourceError } from "../http.js";
 import { fetchFeedPage, fetchTender, tenderWebUrl } from "../sources/cdb.js";
 import { resolveTenderId } from "../resolve.js";
 import { getIndex, indexUnavailableReason } from "../index/access.js";
+import { benchmarkTender } from "../index/access.js";
 import {
   searchTenders,
   SOURCE_PAGE_SIZE,
@@ -341,6 +342,59 @@ export function registerTools(server: McpServer) {
           })),
           source: SOURCE_NOTE,
         });
+      }),
+  );
+
+  server.registerTool(
+    "proyav_price_benchmark",
+    {
+      title: "Порівняння ціни",
+      description: [
+        "Порівнює ціну процедури з тим, за скільки схоже купували інші. Це відповідь на питання",
+        "«ми не переплачуємо?» у тому вигляді, в якому його ставлять люди.",
+        "",
+        "Схожими вважаються закупівлі з тим самим кодом CPV і тією самою одиницею виміру.",
+        "Одиниця обовʼязкова: кілометр дороги і квадратний метр дороги це різні числа,",
+        "і порівняння їх дало б переконливу дурницю.",
+        "",
+        "Інструмент відмовляється рахувати, коли схожих закупівель менше восьми, коли одиниця",
+        "виміру невідома або коли позиції процедури мають різні одиниці. У відповіді завжди видно",
+        "вибірку: скільки процедур, за який період, медіана і розкид, а не одне число.",
+        "",
+        "Відхилення від медіани не є порушенням. Формулюйте це як привід перевірити, а не як висновок.",
+      ].join("\n"),
+      inputSchema: {
+        tenderID: z
+          .string()
+          .min(4)
+          .describe("Номер процедури вигляду UA-2026-08-25-011022-a."),
+        windowDays: z
+          .number()
+          .int()
+          .min(30)
+          .max(2000)
+          .optional()
+          .describe("Скільки днів навколо процедури брати у вибірку. За замовчуванням 550."),
+        sampleSize: z
+          .number()
+          .int()
+          .min(1)
+          .max(20)
+          .optional()
+          .describe("Скільки прикладів схожих закупівель показати."),
+      },
+    },
+    async ({ tenderID, windowDays, sampleSize }) =>
+      guard(async () => {
+        const result = benchmarkTender({ tenderID, windowDays, sampleSize });
+        if (!result) {
+          return asJsonContent({
+            error: "no_index",
+            message:
+              "Порівняння цін працює лише по локальному індексу, а його немає. Побудувати: npx proyav-prozorro crawl --recent, далі npx proyav-prozorro enrich.",
+          });
+        }
+        return asJsonContent({ ...result, source: SOURCE_NOTE });
       }),
   );
 

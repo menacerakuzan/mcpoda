@@ -8,6 +8,7 @@ import {
   SchemaMismatch,
 } from "./db.js";
 import { lookupByTenderId, searchIndex, type IndexSearch } from "./queries.js";
+import { benchmark } from "../analysis/benchmark.js";
 
 /**
  * The index is optional. A person who has just installed the server has no
@@ -26,6 +27,7 @@ export type Index = {
   path: string;
   stats(): IndexStats;
   lookup(tenderID: string): ReturnType<typeof lookupByTenderId>;
+  benchmark(options: Parameters<typeof benchmark>[1]): ReturnType<typeof benchmark>;
   search(query: IndexSearch): ReturnType<typeof searchIndex>;
   close(): void;
 };
@@ -55,10 +57,16 @@ export function getIndex(): Index | null {
     path,
     stats: () => indexStats(db),
     lookup: (tenderID) => lookupByTenderId(db, tenderID),
+    benchmark: (options) => benchmark(db, options),
     search: (query) => searchIndex(db, query),
     close: () => db.close(),
   };
   return cached;
+}
+
+/** Convenience for tools: null when there is no index to read. */
+export function benchmarkTender(options: Parameters<typeof benchmark>[1]) {
+  return getIndex()?.benchmark(options) ?? null;
 }
 
 /** Tests need a clean slate between cases. */

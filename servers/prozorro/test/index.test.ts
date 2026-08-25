@@ -69,16 +69,49 @@ beforeEach(() => {
 });
 
 describe("схема", () => {
-  it("відмовляється відкривати індекс старої версії", () => {
+  it("відмовляється відкривати індекс несумісної версії", () => {
     const path = join(mkdtempSync(join(tmpdir(), "proyav-")), "index.sqlite");
 
     const first = openDatabase(path);
-    writeState(first, "schema_version", String(SCHEMA_VERSION - 1));
+    writeState(first, "schema_version", "1");
     first.close();
 
     // Silently reading a stale layout would answer questions with wrong data,
     // which is worse than refusing: the index is a cache and can be rebuilt.
     assert.throws(() => openDatabase(path), SchemaMismatch);
+  });
+
+  it("оновлює схему 2 на місці, не вимагаючи перезбірки", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "proyav-")), "index.sqlite");
+
+    const first = openDatabase(path);
+    first
+      .prepare(
+        "insert into tenders (id, tender_id, modified, enriched_at) values ('id-1', 'UA-1', 1, 1)",
+      )
+      .run();
+    // pretend this index was built before the unit columns existed
+    first.exec("alter table tenders drop column unit");
+    first.exec("alter table tenders drop column quantity");
+    first.exec("alter table tenders drop column unit_kind");
+    writeState(first, "schema_version", "2");
+    first.close();
+
+    const upgraded = openDatabase(path);
+    assert.equal(readState(upgraded, "schema_version"), String(SCHEMA_VERSION));
+
+    const row = upgraded
+      .prepare("select id, unit, enriched_at from tenders where id = 'id-1'")
+      .get() as { id: string; unit: string | null; enriched_at: number | null };
+
+    assert.equal(row.id, "id-1", "рядки старого індексу зникли під час оновлення");
+    assert.equal(row.unit, null);
+    assert.equal(
+      row.enriched_at,
+      null,
+      "процедура без нових полів має повернутись у чергу збагачення",
+    );
+    upgraded.close();
   });
 
   it("проставляє версію новому індексу", () => {
