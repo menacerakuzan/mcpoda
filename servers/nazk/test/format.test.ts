@@ -57,14 +57,26 @@ describe("вимарювання", () => {
   });
 
   it("не пропускає вимаране у відповідь", () => {
-    const card = projectDeclaration(declaration());
-    const text = JSON.stringify(card);
+    // The marker has to sit in fields the projection actually reads, otherwise
+    // the test passes while the filter is broken. Found exactly that way: the
+    // first version put it only in `passport`, which is never projected.
+    const closed = declaration();
+    const person = (closed.data.step_1 as { data: Record<string, unknown> }).data;
+    person.region = "[Конфіденційна інформація]";
+    person.workPost = "[Не застосовується]";
+    (closed.data.step_3 as { data: Array<Record<string, unknown>> }).data[0]!.region =
+      "[Конфіденційна інформація]";
+
+    const card = projectDeclaration(closed);
 
     assert.doesNotMatch(
-      text,
-      /Конфіденційна інформація/,
+      JSON.stringify(card),
+      /Конфіденційна інформація|Не застосовується/,
       "позначка реєстру просочилась у відповідь замість того, щоб стати null",
     );
+    assert.equal(card.declarant.region, null);
+    assert.equal(card.declarant.position, null);
+    assert.equal(card.realEstate[0]?.region, null);
   });
 
   it("не передає адрес і дат народження родичів", () => {
