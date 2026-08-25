@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import { openDatabase, indexStats, readState } from "../dist/index/db.js";
-import { crawl } from "../dist/index/crawl.js";
+import { catchUp, crawl } from "../dist/index/crawl.js";
 import { lookupByTenderId, searchIndex, pendingEnrichment } from "../dist/index/queries.js";
 import { enrich } from "../dist/index/enrich.js";
 
@@ -32,16 +32,21 @@ const entry = (n: number, overrides: Partial<Entry> = {}): Entry => ({
   ...overrides,
 });
 
-/** A feed that hands out prepared pages and remembers how it was called. */
+/**
+ * A feed that hands out prepared pages and remembers how it was called.
+ *
+ * It always returns a next offset, exactly like the real source: even at the
+ * head, Prozorro hands back a cursor and simply repeats the last page. Getting
+ * this wrong in the fake would test a behaviour the server never meets.
+ */
 function fakeFeed(pages: Entry[][]) {
   const seen: Array<{ offset?: string; descending?: boolean }> = [];
   const fetchPage = async (options: { offset?: string; descending?: boolean }) => {
     seen.push({ offset: options.offset, descending: options.descending });
     const index = options.offset ? Number(options.offset) : 0;
-    const data = pages[index] ?? [];
     return {
-      data,
-      next_page: index + 1 < pages.length ? { offset: String(index + 1) } : undefined,
+      data: pages[index] ?? [],
+      next_page: { offset: String(index + 1) },
     };
   };
   return { fetchPage: fetchPage as never, seen };
@@ -120,6 +125,53 @@ describe("crawl", () => {
     await crawl(db, { fetchPage, delayMs: 0, pageSize: 2 });
 
     assert.equal(seen.length, 1, "краулер читав далі після короткої сторінки");
+  });
+});
+
+describe("catchUp", () => {
+  it("відмовляється працювати без збереженого курсора", async () => {
+    await assert.rejects(
+      () => catchUp(db, { delayMs: 0 }),
+      /курсора/,
+      "догін без курсора мовчки почав би з 2015 року",
+    );
+  });
+
+  it("читає лише те, що зʼявилось після минулого проходу", async () => {
+    const pages = [[entry(1)], [entry(2)]];
+
+    await crawl(db, { ...fakeFeed(pages), delayMs: 0, pageSize: 1, maxPages: 1 });
+
+    const second = fakeFeed(pages);
+    const progress = await catchUp(db, {
+      fetchPage: second.fetchPage,
+      delayMs: 0,
+      pageSize: 1,
+    });
+
+    assert.equal(second.seen[0]?.offset, "1", "догін почав з початку стрічки");
+    assert.equal(progress.inserted, 1);
+  });
+
+  it("оновлює процедуру, яку змінили після індексації", async () => {
+    await crawl(db, {
+      ...fakeFeed([[entry(1, { status: "active.tendering" })]]),
+      delayMs: 0,
+      pageSize: 1,
+      maxPages: 1,
+    });
+
+    await catchUp(db, {
+      ...fakeFeed([
+        [],
+        [entry(1, { status: "complete", dateModified: "2026-08-30T10:00:00+03:00" })],
+      ]),
+      delayMs: 0,
+      pageSize: 1,
+    });
+
+    const row = lookupByTenderId(db, "UA-2026-08-01-000001-a");
+    assert.equal(row?.status, "complete", "зміна статусу не доїхала в індекс");
   });
 });
 
@@ -219,6 +271,30 @@ describe("enrich", () => {
     assert.deepEqual(seen, ["id-2", "id-1"], "збагачення повернулось до вже обробленої");
 
     assert.equal(pendingEnrichment(db, 10).length, 0);
+  });
+
+  it("не перевищує заданої паралельності", async () => {
+    // This is a national service: a pool that quietly grows would turn a backfill
+    // into a flood.
+    const { fetchPage } = fakeFeed([
+      Array.from({ length: 12 }, (_, i) => entry(i + 1, { id: `id-${i + 1}` })),
+    ]);
+    await crawl(db, { fetchPage, delayMs: 0, pageSize: 12 });
+
+    let inFlight = 0;
+    let peak = 0;
+    const fetch = (async (id: string) => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight--;
+      return { id, title: "Назва", value: { amount: 1 }, items: [] };
+    }) as never;
+
+    await enrich(db, { limit: 12, delayMs: 0, concurrency: 3, fetch });
+
+    assert.ok(peak <= 3, `одночасно виконувалось ${peak} запитів замість 3`);
+    assert.ok(peak > 1, "паралельність не працює: запити йшли по одному");
   });
 
   it("переживає недоступну процедуру й не зупиняє прохід", async () => {

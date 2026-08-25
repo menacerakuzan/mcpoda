@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { crawl } from "./index/crawl.js";
+import { catchUp, crawl } from "./index/crawl.js";
 import { enrich } from "./index/enrich.js";
 import { databasePath, indexStats, openDatabase } from "./index/db.js";
 
@@ -43,6 +43,29 @@ if (command === "crawl") {
   console.error(
     `готово: ${progress.entries} записів, ${progress.inserted} нових, ${progress.updated} оновлених`,
   );
+} else if (command === "update") {
+  // What a scheduled job runs: read whatever changed since the last pass, then
+  // fill in titles for the newest procedures that still lack them.
+  const started = Date.now();
+  console.error("догоняємо зміни від збереженого курсора");
+
+  const crawled = await catchUp(db, {
+    onProgress: (p) => {
+      process.stderr.write(
+        `\rсторінок ${p.pages} · записів ${p.entries} · нових ${p.inserted} · до ${p.cursorDate?.slice(0, 10) ?? "?"}   `,
+      );
+    },
+  });
+  process.stderr.write("\n");
+
+  const enrichLimit = Number(flag("enrich") ?? 200);
+  const enriched = enrichLimit
+    ? await enrich(db, { limit: enrichLimit })
+    : { updated: 0, failed: 0, processed: 0 };
+
+  console.error(
+    `готово за ${Math.round((Date.now() - started) / 1000)} с: ${crawled.inserted} нових, ${crawled.updated} оновлених, ${enriched.updated} збагачених`,
+  );
 } else if (command === "enrich") {
   const limit = Number(flag("limit") ?? 500);
   const started = Date.now();
@@ -50,6 +73,7 @@ if (command === "crawl") {
   console.error(`збагачуємо ${limit} процедур, найновіші першими`);
   const progress = await enrich(db, {
     limit,
+    concurrency: Number(flag("concurrency") ?? 4),
     onProgress: (p) => {
       const rate = (
         p.processed / Math.max((Date.now() - started) / 1000, 0.001)
@@ -68,7 +92,7 @@ if (command === "crawl") {
   console.log(JSON.stringify({ path: databasePath(), ...stats }, null, 2));
 } else {
   console.error(
-    "команди: crawl [--pages=N] [--from=РРРР-ММ-ДД] [--recent] | enrich [--limit=N] | stats",
+    "команди: crawl [--pages=N] [--from=РРРР-ММ-ДД] [--recent] | update [--enrich=N] | enrich [--limit=N] [--concurrency=N] | stats",
   );
   process.exit(1);
 }

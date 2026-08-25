@@ -2,6 +2,20 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { searchTenders, SOURCE_PAGE_SIZE } from "../dist/sources/search.js";
 import { fetchFeedPage, fetchTender } from "../dist/sources/cdb.js";
+import { requestJson } from "../dist/http.js";
+
+const SEARCH_URL = "https://prozorro.gov.ua/api/search/tenders";
+
+/**
+ * The typed client only forwards fields the server actually uses, so probing how
+ * the source treats other parameters has to go over raw HTTP.
+ */
+const rawSearch = (body: Record<string, unknown>) =>
+  requestJson<{ total: number; data: Array<{ tenderID?: string }> }>(SEARCH_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 
 /**
  * These hit the live sources on purpose, and they import from `dist` rather than
@@ -67,6 +81,41 @@ describe("пошуковий сервіс prozorro.gov.ua", { timeout: TIMEOUT }
         "фільтр за статусом перестав працювати",
       );
     }
+  });
+
+  it("мовчки ігнорує cpv та edrpou", async () => {
+    // Both are accepted and then dropped: the response is identical to a query
+    // without them. The server therefore never sends them and filters on its
+    // own side. If this test fails, the source has grown real filters and the
+    // index can stop doing that work.
+    const plain = await rawSearch({ text: "ремонт дороги", page: 1 });
+    const withFilters = await rawSearch({
+      text: "ремонт дороги",
+      page: 1,
+      cpv: ["45233142-6"],
+      edrpou: ["00000000"],
+    });
+
+    assert.equal(
+      withFilters.total,
+      plain.total,
+      "джерело почало враховувати cpv або edrpou: приберіть фільтрацію на своєму боці",
+    );
+    assert.equal(
+      withFilters.data[0]?.tenderID,
+      plain.data[0]?.tenderID,
+      "видача з фільтрами відрізняється: джерело їх більше не ігнорує",
+    );
+  });
+
+  it("не приймає region як назву області", async () => {
+    // The parameter exists but expects an opaque numeric code and behaves
+    // inconsistently, so the server filters by region name itself.
+    await assert.rejects(
+      () => rawSearch({ text: "ремонт", page: 1, region: "Одеська область" }),
+      /422|region/i,
+      "region почав приймати назву області: фільтрацію можна віддати джерелу",
+    );
   });
 
   it("тримає стелю видачі на 10 000 збігів", async () => {

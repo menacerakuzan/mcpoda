@@ -23,6 +23,13 @@ export type EnrichOptions = {
   limit?: number;
   /** This is one request per procedure, so the pause matters more than in the crawl. */
   delayMs?: number;
+  /**
+   * How many procedures are fetched at once. One at a time makes a backfill of
+   * any size impossible; a large pool would hammer a national service. Four with
+   * pacing lands around twenty requests a second, which is a backfill that
+   * finishes without being rude.
+   */
+  concurrency?: number;
   onProgress?: (progress: EnrichProgress) => void;
   fetch?: typeof fetchTender;
 };
@@ -46,6 +53,7 @@ export async function enrich(
   const {
     limit = 500,
     delayMs = 120,
+    concurrency = 4,
     onProgress,
     fetch = fetchTender,
   } = options;
@@ -54,7 +62,9 @@ export async function enrich(
   const queue = pendingEnrichment(db, limit);
   const progress: EnrichProgress = { processed: 0, updated: 0, failed: 0 };
 
-  for (const row of queue) {
+  let next = 0;
+
+  const handle = async (row: { id: string }) => {
     progress.processed++;
 
     try {
@@ -82,9 +92,21 @@ export async function enrich(
     }
 
     onProgress?.({ ...progress });
-    if (delayMs > 0)
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-  }
+  };
+
+  /** Each worker pulls the next procedure itself, so a slow one never blocks the rest. */
+  const worker = async () => {
+    while (next < queue.length) {
+      const row = queue[next++];
+      if (!row) break;
+      await handle(row);
+      if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(concurrency, 8)) }, worker),
+  );
 
   return progress;
 }

@@ -45,19 +45,53 @@ export type CrawlOptions = {
   fetchPage?: typeof fetchFeedPage;
 };
 
-const UPSERT = `
-insert into tenders (
+/**
+ * Insert and update are two statements on purpose. A single upsert cannot say
+ * whether it inserted or updated, and the obvious workaround — counting rows
+ * before and after — is a full table scan on every page. That is what dragged
+ * the crawl from 2500 records a second down to 600 as the table grew.
+ *
+ * `insert or ignore` reports changes = 0 when the row already exists, which is
+ * the same information for the price of an index lookup.
+ */
+const INSERT = `
+insert or ignore into tenders (
   id, tender_id, date_modified, status, method, buyer_edrpou, buyer_name, region
 ) values (?, ?, ?, ?, ?, ?, ?, ?)
-on conflict(id) do update set
-  tender_id     = coalesce(excluded.tender_id, tenders.tender_id),
-  date_modified = excluded.date_modified,
-  status        = coalesce(excluded.status, tenders.status),
-  method        = coalesce(excluded.method, tenders.method),
-  buyer_edrpou  = coalesce(excluded.buyer_edrpou, tenders.buyer_edrpou),
-  buyer_name    = coalesce(excluded.buyer_name, tenders.buyer_name),
-  region        = coalesce(excluded.region, tenders.region)
 `;
+
+const UPDATE = `
+update tenders set
+  tender_id     = coalesce(?, tender_id),
+  date_modified = ?,
+  status        = coalesce(?, status),
+  method        = coalesce(?, method),
+  buyer_edrpou  = coalesce(?, buyer_edrpou),
+  buyer_name    = coalesce(?, buyer_name),
+  region        = coalesce(?, region)
+where id = ?
+`;
+
+/**
+ * The daily catch-up. It picks up the forward cursor where the last run stopped,
+ * so it only reads what changed since then: a procedure that was updated shows
+ * up again in the feed and overwrites its row.
+ *
+ * This is deliberately the same code path as the history crawl. A separate
+ * "incremental" implementation would drift from it and eventually miss changes.
+ */
+export async function catchUp(
+  db: DatabaseSync,
+  options: Omit<CrawlOptions, "from" | "descending"> = {},
+): Promise<CrawlProgress> {
+  const cursor = readState(db, "crawl_cursor");
+  if (!cursor) {
+    throw new Error(
+      "Немає збереженого курсора: спершу зробіть повний обхід (crawl) або обхід свіжого (crawl --recent).",
+    );
+  }
+  return crawl(db, options);
+}
 
 export async function crawl(
   db: DatabaseSync,
@@ -73,9 +107,8 @@ export async function crawl(
     fetchPage = fetchFeedPage,
   } = options;
 
-  const upsert = db.prepare(UPSERT);
-  const countRow = () =>
-    (db.prepare("select count(*) as n from tenders").get() as { n: number }).n;
+  const insert = db.prepare(INSERT);
+  const update = db.prepare(UPDATE);
 
   // The two directions keep separate cursors: mixing them would make each one
   // skip whatever the other had already passed.
@@ -89,6 +122,11 @@ export async function crawl(
     cursorDate: null,
   };
 
+  // Prefetching the next page while writing the current one was tried and
+  // dropped. Throughput swings between roughly 550 and 900 records a second on
+  // identical code, so short runs cannot tell the two apart, and the plain loop
+  // is the one worth keeping until there is a measurement that can. Worth
+  // revisiting with a long A/B if a full pass ever needs to be faster.
   for (let page = 0; maxPages === 0 || page < maxPages; page++) {
     const feed = await fetchPage({
       limit: pageSize,
@@ -99,14 +137,19 @@ export async function crawl(
 
     if (feed.data.length === 0) break;
 
-    // Counting inside the transaction keeps the numbers honest: a concurrent
-    // writer would otherwise make "new rows" come out negative.
     db.exec("begin immediate");
     let inserted = 0;
     try {
-      const before = countRow();
-      for (const entry of feed.data) upsert.run(...toRow(entry));
-      inserted = countRow() - before;
+      for (const entry of feed.data) {
+        const row = toRow(entry);
+        const result = insert.run(...row);
+        if (result.changes === 0) {
+          const [id, ...rest] = row;
+          update.run(...rest, id);
+        } else {
+          inserted++;
+        }
+      }
       db.exec("commit");
     } catch (error) {
       db.exec("rollback");
@@ -137,8 +180,7 @@ export async function crawl(
     if (!next || feed.data.length < pageSize) break;
     cursor = next;
 
-    if (delayMs > 0)
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 
   return progress;
