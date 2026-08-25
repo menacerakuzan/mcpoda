@@ -1,9 +1,10 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { asJsonContent, projectHit, projectTender } from "../format.js";
+import { asJsonContent, money, projectHit, projectTender } from "../format.js";
 import { SourceError } from "../http.js";
 import { fetchFeedPage, fetchTender, tenderWebUrl } from "../sources/cdb.js";
 import { resolveTenderId } from "../resolve.js";
+import { getIndex } from "../index/access.js";
 import {
   searchTenders,
   SOURCE_PAGE_SIZE,
@@ -206,11 +207,23 @@ export function registerTools(server: McpServer) {
         let uuid: string | null = null;
         let outcome: Awaited<ReturnType<typeof resolveTenderId>> | null = null;
 
+        let resolvedVia = "internal id";
+
         if (/^[0-9a-f]{32}$/i.test(id)) {
           uuid = id;
         } else {
-          outcome = await resolveTenderId(id);
-          if (outcome.found) uuid = outcome.uuid;
+          // The index turns the hardest lookup in the project into a primary key
+          // hit. Without it, the feed scan only reaches procedures touched
+          // recently, so an old one is simply unreachable.
+          const indexed = getIndex()?.lookup(id);
+          if (indexed) {
+            uuid = indexed.id;
+            resolvedVia = "локальний індекс";
+          } else {
+            outcome = await resolveTenderId(id);
+            if (outcome.found) uuid = outcome.uuid;
+            resolvedVia = "сканування стрічки";
+          }
         }
 
         if (!uuid) {
@@ -220,10 +233,11 @@ export function registerTools(server: McpServer) {
                 ? "bad_format"
                 : "not_found",
             message: [
-              `Не вдалося знайти процедуру ${id} у стрічці змін за розумний час.`,
-              "Стрічка впорядкована за датою останньої зміни, тому давні процедури можуть лежати далеко",
-              "від дати свого створення. Спробуйте proyav_search_tenders, щоб перевірити номер,",
-              "або відкрийте сторінку процедури вручну.",
+              `Не вдалося знайти процедуру ${id}.`,
+              getIndex()
+                ? "Її немає ні в локальному індексі, ні у свіжій частині стрічки змін. Можливо, індекс ще не дійшов до цього періоду: перевірте proyav_index_status."
+                : "Локального індексу немає, а стрічка змін показує лише нещодавно змінені процедури. Побудуйте індекс, щоб знаходити давні процедури за номером.",
+              "Спробуйте proyav_search_tenders, щоб перевірити номер, або відкрийте сторінку процедури вручну.",
             ].join(" "),
             webUrl: tenderWebUrl(id),
           });
@@ -232,9 +246,142 @@ export function registerTools(server: McpServer) {
         const tender = await fetchTender(uuid);
         return asJsonContent(
           full
-            ? { raw: tender, source: SOURCE_NOTE }
-            : { ...projectTender(tender), source: SOURCE_NOTE },
+            ? { raw: tender, resolvedVia, source: SOURCE_NOTE }
+            : { ...projectTender(tender), resolvedVia, source: SOURCE_NOTE },
         );
+      }),
+  );
+
+  server.registerTool(
+    "proyav_search_index",
+    {
+      title: "Пошук по локальному індексу",
+      description: [
+        "Пошук по власному індексу на цій машині. Використовуйте його, коли потрібне те,",
+        "чого не дає пошук джерела: процедури конкретного замовника за кодом ЄДРПОУ,",
+        "фільтр за CPV, за періодом, або коли треба більше ніж 10 000 збігів.",
+        "",
+        "Пошук враховує українську морфологію: «дорога» знаходить «доріг» і «дорозі».",
+        "",
+        "Індекс будується двома проходами, і в ньому може бути не все. У відповіді завжди",
+        "видно, яка частка процедур уже має назву й суму: якщо вона мала, покладайтесь",
+        "на proyav_search_tenders. Стан індексу показує proyav_index_status.",
+      ].join("\n"),
+      inputSchema: {
+        text: z
+          .string()
+          .optional()
+          .describe(
+            "Слова для пошуку. Можна не вказувати, якщо є інші фільтри.",
+          ),
+        status: z.array(z.enum(TENDER_STATUSES)).optional(),
+        region: z.string().optional().describe("Частина назви області."),
+        buyerEdrpou: z
+          .string()
+          .optional()
+          .describe(
+            "Код ЄДРПОУ замовника. Джерело такого фільтра не має взагалі.",
+          ),
+        cpvPrefix: z
+          .string()
+          .optional()
+          .describe("Початок коду CPV, наприклад 45233 для дорожніх робіт."),
+        minValue: z.number().optional(),
+        maxValue: z.number().optional(),
+        from: z.string().optional().describe("Дата від, РРРР-ММ-ДД."),
+        to: z.string().optional().describe("Дата до, РРРР-ММ-ДД."),
+        limit: z.number().int().min(1).max(200).optional(),
+        offset: z.number().int().min(0).optional(),
+      },
+    },
+    async (args) =>
+      guard(async () => {
+        const index = getIndex();
+        if (!index) {
+          return asJsonContent({
+            error: "no_index",
+            message: [
+              "Локального індексу немає. Він будується окремою командою і живе на цій машині:",
+              "npx proyav-prozorro crawl --recent, далі npx proyav-prozorro enrich.",
+              "Поки індексу немає, користуйтесь proyav_search_tenders.",
+            ].join(" "),
+          });
+        }
+
+        const result = index.search(args);
+        return asJsonContent({
+          query: args,
+          total: result.total,
+          returned: result.rows.length,
+          coverage: {
+            share: Number(result.enrichedShare.toFixed(3)),
+            note:
+              result.enrichedShare < 0.5
+                ? "Назви та суми має менша частина індексу, тому пошук за словами бачить не все. Для повноти беріть proyav_search_tenders."
+                : undefined,
+          },
+          results: result.rows.map((row) => ({
+            tenderID: row.tender_id,
+            title: row.title,
+            status: row.status,
+            value: row.value_amount
+              ? money({
+                  amount: row.value_amount,
+                  currency: row.value_currency ?? "UAH",
+                })
+              : null,
+            cpv: row.cpv,
+            buyer: {
+              name: row.buyer_name,
+              edrpou: row.buyer_edrpou,
+              region: row.region,
+            },
+            dateModified: row.date_modified,
+            url: row.tender_id ? tenderWebUrl(row.tender_id) : undefined,
+          })),
+          source: SOURCE_NOTE,
+        });
+      }),
+  );
+
+  server.registerTool(
+    "proyav_index_status",
+    {
+      title: "Стан локального індексу",
+      description: [
+        "Скільки процедур в індексі, скільки з них мають назву й суму, і за який період",
+        "він уже зібраний. Викликайте, коли пошук по індексу повертає підозріло мало:",
+        "відповідь покаже, чи це справді порожньо, чи індекс просто ще не дійшов.",
+      ].join("\n"),
+      inputSchema: {},
+    },
+    async () =>
+      guard(async () => {
+        const index = getIndex();
+        if (!index) {
+          return asJsonContent({
+            present: false,
+            message:
+              "Індексу немає. Побудувати: npx proyav-prozorro crawl --recent, далі npx proyav-prozorro enrich.",
+          });
+        }
+
+        const stats = index.stats();
+        return asJsonContent({
+          present: true,
+          path: index.path,
+          tenders: stats.tenders,
+          withTitleAndValue: stats.enriched,
+          coverage: stats.tenders
+            ? Number((stats.enriched / stats.tenders).toFixed(3))
+            : 0,
+          period: { oldest: stats.oldest, newest: stats.newest },
+          progress: {
+            history: stats.historyCursorDate,
+            recent: stats.recentCursorDate,
+          },
+          updatedAt: stats.updatedAt,
+        });
       }),
   );
 
