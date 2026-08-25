@@ -5,6 +5,7 @@ import { SourceError } from "../http.js";
 import { fetchFeedPage, fetchTender, tenderWebUrl } from "../sources/cdb.js";
 import { resolveTenderId } from "../resolve.js";
 import { getIndex, indexUnavailableReason } from "../index/access.js";
+import { checkTender } from "../analysis/check.js";
 import { benchmarkTender } from "../index/access.js";
 import {
   searchTenders,
@@ -473,6 +474,60 @@ export function registerTools(server: McpServer) {
         const index = getIndex();
         if (!index) return asJsonContent(NO_INDEX);
         return asJsonContent({ ...index.compareBuyers(args), source: SOURCE_NOTE });
+      }),
+  );
+
+  server.registerTool(
+    "proyav_check_tender",
+    {
+      title: "Перевірка тендера",
+      description: [
+        "Збирає в одну відповідь усе, що відкриті дані кажуть про одну процедуру:",
+        "хто змагався, за скільки, хто виграв, наскільки торги збили ціну і чи є серед учасників",
+        "збіги, які варто перевірити — спільний телефон, пошта, адреса, контактна особа",
+        "або майже однаковий час подання.",
+        "",
+        "Дві властивості Prozorro визначають, коли перевірка взагалі можлива, і інструмент",
+        "про це прямо каже, а не повертає порожнечу:",
+        "учасників не публікують, доки триває подання пропозицій, тому перевіряти можна",
+        "лише з етапу кваліфікації;",
+        "близько трьох чвертей процедур це звіт про прямий договір, де учасників немає за визначенням.",
+        "",
+        "Кожен знайдений збіг подається разом із буденним поясненням, чому він може нічого не означати.",
+        "Переказуйте людині обидві частини. Це підказка, куди подивитись, а не висновок про порушення.",
+      ].join("\n"),
+      inputSchema: {
+        id: z
+          .string()
+          .min(4)
+          .describe("Номер процедури UA-… або внутрішній ідентифікатор."),
+      },
+    },
+    async ({ id }) =>
+      guard(async () => {
+        let uuid: string | null = null;
+
+        if (/^[0-9a-f]{32}$/i.test(id)) {
+          uuid = id;
+        } else {
+          const indexed = getIndex()?.lookup(id);
+          if (indexed) uuid = indexed.id;
+          else {
+            const outcome = await resolveTenderId(id);
+            if (outcome.found) uuid = outcome.uuid;
+          }
+        }
+
+        if (!uuid) {
+          return asJsonContent({
+            error: "not_found",
+            message: `Процедуру ${id} не знайдено ні в індексі, ні у свіжій частині стрічки змін. Перевірте номер або стан індексу через proyav_index_status.`,
+            webUrl: tenderWebUrl(id),
+          });
+        }
+
+        const tender = await fetchTender(uuid);
+        return asJsonContent({ ...checkTender(tender), source: SOURCE_NOTE });
       }),
   );
 
