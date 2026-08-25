@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { fetchTender } from "../sources/cdb.js";
 import { normalizeText } from "./normalize.js";
 import { pendingEnrichment } from "./queries.js";
+import { toEpoch } from "./db.js";
 
 /**
  * The feed never carries a title, an amount or a CPV code, so a second pass
@@ -81,7 +82,7 @@ export async function enrich(
         tender.value?.currency ?? null,
         items[0]?.classification?.id ?? null,
         tender.status ?? null,
-        new Date().toISOString(),
+        toEpoch(new Date().toISOString()),
         row.id,
       );
       progress.updated++;

@@ -5,6 +5,7 @@ import {
   indexStats,
   openDatabase,
   type IndexStats,
+  SchemaMismatch,
 } from "./db.js";
 import { lookupByTenderId, searchIndex, type IndexSearch } from "./queries.js";
 
@@ -16,6 +17,10 @@ import { lookupByTenderId, searchIndex, type IndexSearch } from "./queries.js";
  */
 
 let cached: Index | null | undefined;
+let lastError: string | null = null;
+
+/** Why the index is unavailable, when the reason is worth telling the person. */
+export const indexUnavailableReason = () => lastError;
 
 export type Index = {
   path: string;
@@ -37,8 +42,11 @@ export function getIndex(): Index | null {
   let db: DatabaseSync;
   try {
     db = openDatabase(path);
-  } catch {
-    // A corrupt or locked database must not take the server down with it.
+  } catch (error) {
+    // A stale, corrupt or locked index must not take the server down with it:
+    // the tools fall back to querying the sources directly.
+    lastError =
+      error instanceof SchemaMismatch ? error.message : null;
     cached = null;
     return cached;
   }
@@ -57,4 +65,5 @@ export function getIndex(): Index | null {
 export function resetIndexCache() {
   cached?.close();
   cached = undefined;
+  lastError = null;
 }

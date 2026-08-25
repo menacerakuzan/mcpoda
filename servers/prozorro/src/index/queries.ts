@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { fromEpoch, toEpoch } from "./db.js";
 import { normalizeQuery } from "./normalize.js";
 
 /** Reads over the local index. Nothing here touches the network. */
@@ -18,11 +19,21 @@ export type IndexedTender = {
   cpv: string | null;
 };
 
-const COLUMNS = `
-  id, tender_id, date_modified, status, method,
-  buyer_edrpou, buyer_name, region,
-  title, value_amount, value_currency, cpv
+/** Buyer names live in their own table, so every read joins them back in. */
+const SELECT = `
+select t.id, t.tender_id, t.modified, t.status, t.method,
+       t.buyer_edrpou, b.name as buyer_name, b.region as region,
+       t.title, t.value_amount, t.value_currency, t.cpv
+from tenders t
+left join buyers b on b.edrpou = t.buyer_edrpou
 `;
+
+type Row = Omit<IndexedTender, "date_modified"> & { modified: number };
+
+const toTender = (row: Row): IndexedTender => {
+  const { modified, ...rest } = row;
+  return { ...rest, date_modified: fromEpoch(modified) };
+};
 
 /**
  * The whole reason the index exists: the sources give no way to turn a UA-
@@ -34,11 +45,9 @@ export function lookupByTenderId(
   tenderID: string,
 ): IndexedTender | null {
   const row = db
-    .prepare(
-      `select ${COLUMNS} from tenders where tender_id = ? collate nocase limit 1`,
-    )
-    .get(tenderID.trim()) as IndexedTender | undefined;
-  return row ?? null;
+    .prepare(`${SELECT} where t.tender_id = ? collate nocase limit 1`)
+    .get(tenderID.trim()) as Row | undefined;
+  return row ? toTender(row) : null;
 }
 
 export type IndexSearch = {
@@ -90,7 +99,7 @@ export function searchIndex(
     params.push(...query.status);
   }
   if (query.region) {
-    where.push("t.region like ?");
+    where.push("b.region like ?");
     params.push(`%${query.region}%`);
   }
   if (query.buyerEdrpou) {
@@ -110,12 +119,13 @@ export function searchIndex(
     params.push(query.maxValue);
   }
   if (query.from) {
-    where.push("t.date_modified >= ?");
-    params.push(query.from);
+    where.push("t.modified >= ?");
+    params.push(toEpoch(query.from));
   }
   if (query.to) {
-    where.push("t.date_modified <= ?");
-    params.push(query.to);
+    // an end date means the whole day, not its first second
+    where.push("t.modified <= ?");
+    params.push(toEpoch(query.to) + 86_399);
   }
 
   const clause = where.length ? `where ${where.join(" and ")}` : "";
@@ -123,15 +133,14 @@ export function searchIndex(
   const offset = Math.max(query.offset ?? 0, 0);
 
   const rows = db
-    .prepare(
-      `select ${COLUMNS} from tenders t ${clause}
-       order by t.date_modified desc
-       limit ? offset ?`,
-    )
-    .all(...params, limit, offset) as IndexedTender[];
+    .prepare(`${SELECT} ${clause} order by t.modified desc limit ? offset ?`)
+    .all(...params, limit, offset) as Row[];
 
   const { total } = db
-    .prepare(`select count(*) as total from tenders t ${clause}`)
+    .prepare(
+      `select count(*) as total from tenders t
+       left join buyers b on b.edrpou = t.buyer_edrpou ${clause}`,
+    )
     .get(...params) as { total: number };
 
   const share = db
@@ -143,7 +152,7 @@ export function searchIndex(
     .get() as { all_rows: number; done: number | null };
 
   return {
-    rows,
+    rows: rows.map(toTender),
     total,
     enrichedShare: share.all_rows ? (share.done ?? 0) / share.all_rows : 0,
   };
@@ -167,7 +176,7 @@ export function pendingEnrichment(
     .prepare(
       `select id, tender_id from tenders
        where enriched_at is null
-       order by date_modified desc
+       order by modified desc
        limit ?`,
     )
     .all(limit) as Array<{ id: string; tender_id: string | null }>;

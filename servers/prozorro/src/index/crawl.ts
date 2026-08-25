@@ -4,7 +4,7 @@ import {
   FEED_INLINE_FIELDS,
   type FeedEntry,
 } from "../sources/cdb.js";
-import { readState, writeState } from "./db.js";
+import { readState, toEpoch, writeState } from "./db.js";
 
 /**
  * Walks the change feed forward and records what it gives away for free:
@@ -56,19 +56,25 @@ export type CrawlOptions = {
  */
 const INSERT = `
 insert or ignore into tenders (
-  id, tender_id, date_modified, status, method, buyer_edrpou, buyer_name, region
-) values (?, ?, ?, ?, ?, ?, ?, ?)
+  id, tender_id, modified, status, method, buyer_edrpou
+) values (?, ?, ?, ?, ?, ?)
+`;
+
+/** The same buyer runs thousands of procedures, so the name is stored once. */
+const BUYER = `
+insert into buyers (edrpou, name, region) values (?, ?, ?)
+on conflict(edrpou) do update set
+  name   = coalesce(excluded.name, buyers.name),
+  region = coalesce(excluded.region, buyers.region)
 `;
 
 const UPDATE = `
 update tenders set
-  tender_id     = coalesce(?, tender_id),
-  date_modified = ?,
-  status        = coalesce(?, status),
-  method        = coalesce(?, method),
-  buyer_edrpou  = coalesce(?, buyer_edrpou),
-  buyer_name    = coalesce(?, buyer_name),
-  region        = coalesce(?, region)
+  tender_id    = coalesce(?, tender_id),
+  modified     = ?,
+  status       = coalesce(?, status),
+  method       = coalesce(?, method),
+  buyer_edrpou = coalesce(?, buyer_edrpou)
 where id = ?
 `;
 
@@ -109,6 +115,7 @@ export async function crawl(
 
   const insert = db.prepare(INSERT);
   const update = db.prepare(UPDATE);
+  const buyer = db.prepare(BUYER);
 
   // The two directions keep separate cursors: mixing them would make each one
   // skip whatever the other had already passed.
@@ -141,6 +148,17 @@ export async function crawl(
     let inserted = 0;
     try {
       for (const entry of feed.data) {
+        const edrpou = entry.procuringEntity?.identifier?.id ?? null;
+        if (edrpou) {
+          buyer.run(
+            edrpou,
+            entry.procuringEntity?.name ??
+              entry.procuringEntity?.identifier?.legalName ??
+              null,
+            entry.procuringEntity?.address?.region ?? null,
+          );
+        }
+
         const row = toRow(entry);
         const result = insert.run(...row);
         if (result.changes === 0) {
@@ -190,13 +208,9 @@ function toRow(entry: FeedEntry) {
   return [
     entry.id,
     entry.tenderID ?? null,
-    entry.dateModified,
+    toEpoch(entry.dateModified),
     entry.status ?? null,
     entry.procurementMethodType ?? null,
     entry.procuringEntity?.identifier?.id ?? null,
-    entry.procuringEntity?.name ??
-      entry.procuringEntity?.identifier?.legalName ??
-      null,
-    entry.procuringEntity?.address?.region ?? null,
   ] as const;
 }

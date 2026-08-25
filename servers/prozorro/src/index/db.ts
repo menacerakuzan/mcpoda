@@ -11,16 +11,41 @@ export function databasePath() {
   return process.env.PROYAV_DB ?? join(homedir(), ".proyav", "prozorro.sqlite");
 }
 
+/**
+ * Bumped whenever the layout changes. The index is a rebuildable cache, so a
+ * mismatch is answered by rebuilding rather than by migration code that would
+ * have to stay correct forever.
+ */
+export const SCHEMA_VERSION = 2;
+
+/**
+ * Two decisions here were made by measuring 200 000 real rows, because at twenty
+ * million rows the difference is gigabytes on someone's laptop:
+ *
+ * buyers live in their own table — 31 870 distinct buyers were repeating their
+ * 65-character names on every procedure they ever ran;
+ * dates are unix seconds rather than ISO strings — 32 bytes and a fat index
+ * become 8 bytes and a slim one.
+ *
+ * Together they took the index from 435 to 220 bytes per row. Storing the id as
+ * a 16-byte blob would save another 33 and was dropped: hex ids appear in URLs,
+ * logs and tool arguments, and converting at every boundary is more bug surface
+ * than the saving is worth.
+ */
 const SCHEMA = `
+create table if not exists buyers (
+  edrpou  text primary key,
+  name    text,
+  region  text
+);
+
 create table if not exists tenders (
   id              text primary key,
   tender_id       text,
-  date_modified   text not null,
+  modified        integer not null,
   status          text,
   method          text,
   buyer_edrpou    text,
-  buyer_name      text,
-  region          text,
 
   -- filled by the enrichment pass: the feed never carries these
   title           text,
@@ -28,14 +53,13 @@ create table if not exists tenders (
   value_amount    real,
   value_currency  text,
   cpv             text,
-  enriched_at     text
+  enriched_at     integer
 );
 
 create unique index if not exists tenders_tender_id on tenders(tender_id);
-create index if not exists tenders_modified on tenders(date_modified);
+create index if not exists tenders_modified on tenders(modified);
 create index if not exists tenders_buyer on tenders(buyer_edrpou);
-create index if not exists tenders_cpv on tenders(cpv);
-create index if not exists tenders_pending on tenders(enriched_at) where enriched_at is null;
+create index if not exists tenders_pending on tenders(modified) where enriched_at is null;
 
 -- external content: the virtual table reads from tenders, so titles are stored once
 create virtual table if not exists tenders_fts using fts5(
@@ -66,6 +90,15 @@ create table if not exists state (
 );
 `;
 
+export class SchemaMismatch extends Error {
+  constructor(readonly found: number) {
+    super(
+      `Індекс має схему версії ${found}, а потрібна ${SCHEMA_VERSION}. Це кеш, який відновлюється: видаліть файл індексу і зберіть заново.`,
+    );
+    this.name = "SchemaMismatch";
+  }
+}
+
 export function openDatabase(path = databasePath()) {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
 
@@ -78,13 +111,33 @@ export function openDatabase(path = databasePath()) {
   // usual trade of durability for throughput on a rebuildable cache.
   db.exec("pragma journal_mode = wal");
   db.exec("pragma synchronous = normal");
+
+  if (tableExists(db, "tenders")) {
+    const version = Number(readState(db, "schema_version") ?? 1);
+    if (version !== SCHEMA_VERSION) {
+      db.close();
+      throw new SchemaMismatch(version);
+    }
+  }
+
   db.exec(SCHEMA);
+  writeState(db, "schema_version", String(SCHEMA_VERSION));
   return db;
 }
 
+function tableExists(db: DatabaseSync, name: string) {
+  return Boolean(
+    db
+      .prepare("select 1 as found from sqlite_master where type='table' and name=?")
+      .get(name),
+  );
+}
+
 export function readState(db: DatabaseSync, key: string): string | null {
+  if (!tableExists(db, "state")) return null;
   const row = db.prepare("select value from state where key = ?").get(key) as
-    { value: string } | undefined;
+    | { value: string }
+    | undefined;
   return row?.value ?? null;
 }
 
@@ -94,9 +147,14 @@ export function writeState(db: DatabaseSync, key: string, value: string) {
   ).run(key, value);
 }
 
+/** Dates travel as ISO strings everywhere outside the index and as seconds inside. */
+export const toEpoch = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
+export const fromEpoch = (seconds: number) => new Date(seconds * 1000).toISOString();
+
 export type IndexStats = {
   tenders: number;
   enriched: number;
+  buyers: number;
   oldest: string | null;
   newest: string | null;
   /** How far the forward pass through history has reached. */
@@ -111,22 +169,27 @@ export function indexStats(db: DatabaseSync): IndexStats {
     .prepare(
       `select count(*) as tenders,
               sum(case when enriched_at is not null then 1 else 0 end) as enriched,
-              min(date_modified) as oldest,
-              max(date_modified) as newest
+              min(modified) as oldest,
+              max(modified) as newest
        from tenders`,
     )
     .get() as {
     tenders: number;
     enriched: number | null;
-    oldest: string | null;
-    newest: string | null;
+    oldest: number | null;
+    newest: number | null;
+  };
+
+  const { buyers } = db.prepare("select count(*) as buyers from buyers").get() as {
+    buyers: number;
   };
 
   return {
     tenders: counts.tenders,
     enriched: counts.enriched ?? 0,
-    oldest: counts.oldest,
-    newest: counts.newest,
+    buyers,
+    oldest: counts.oldest ? fromEpoch(counts.oldest) : null,
+    newest: counts.newest ? fromEpoch(counts.newest) : null,
     historyCursorDate: readState(db, "crawl_cursor_date"),
     recentCursorDate: readState(db, "crawl_cursor_recent_date"),
     updatedAt: readState(db, "crawl_updated_at"),

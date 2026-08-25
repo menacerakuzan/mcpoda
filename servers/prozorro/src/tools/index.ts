@@ -4,7 +4,7 @@ import { asJsonContent, money, projectHit, projectTender } from "../format.js";
 import { SourceError } from "../http.js";
 import { fetchFeedPage, fetchTender, tenderWebUrl } from "../sources/cdb.js";
 import { resolveTenderId } from "../resolve.js";
-import { getIndex } from "../index/access.js";
+import { getIndex, indexUnavailableReason } from "../index/access.js";
 import {
   searchTenders,
   SOURCE_PAGE_SIZE,
@@ -362,6 +362,7 @@ export function registerTools(server: McpServer) {
           return asJsonContent({
             present: false,
             message:
+              indexUnavailableReason() ??
               "Індексу немає. Побудувати: npx proyav-prozorro crawl --recent, далі npx proyav-prozorro enrich.",
           });
         }
@@ -371,6 +372,7 @@ export function registerTools(server: McpServer) {
           present: true,
           path: index.path,
           tenders: stats.tenders,
+          buyers: stats.buyers,
           withTitleAndValue: stats.enriched,
           coverage: stats.tenders
             ? Number((stats.enriched / stats.tenders).toFixed(3))

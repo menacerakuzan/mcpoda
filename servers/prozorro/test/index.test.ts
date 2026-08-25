@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
-import { openDatabase, indexStats, readState } from "../dist/index/db.js";
+import {
+  openDatabase,
+  indexStats,
+  readState,
+  writeState,
+  SchemaMismatch,
+  SCHEMA_VERSION,
+} from "../dist/index/db.js";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { catchUp, crawl } from "../dist/index/crawl.js";
 import { lookupByTenderId, searchIndex, pendingEnrichment } from "../dist/index/queries.js";
 import { enrich } from "../dist/index/enrich.js";
@@ -56,6 +66,24 @@ let db: ReturnType<typeof openDatabase>;
 
 beforeEach(() => {
   db = openDatabase(":memory:");
+});
+
+describe("схема", () => {
+  it("відмовляється відкривати індекс старої версії", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "proyav-")), "index.sqlite");
+
+    const first = openDatabase(path);
+    writeState(first, "schema_version", String(SCHEMA_VERSION - 1));
+    first.close();
+
+    // Silently reading a stale layout would answer questions with wrong data,
+    // which is worse than refusing: the index is a cache and can be rebuilt.
+    assert.throws(() => openDatabase(path), SchemaMismatch);
+  });
+
+  it("проставляє версію новому індексу", () => {
+    assert.equal(readState(db, "schema_version"), String(SCHEMA_VERSION));
+  });
 });
 
 describe("crawl", () => {
