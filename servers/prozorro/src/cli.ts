@@ -26,18 +26,26 @@ if (command === "crawl") {
     from ? `починаємо з ${from}` : "продовжуємо з збереженого курсора",
   );
 
-  const progress = await crawl(db, {
-    maxPages,
-    from,
-    descending: recent,
-    onProgress: (p) => {
-      const seconds = (Date.now() - started) / 1000;
-      const rate = Math.round(p.entries / Math.max(seconds, 0.001));
-      process.stderr.write(
-        `\rсторінок ${p.pages} · записів ${p.entries} · нових ${p.inserted} · ${rate}/с · до ${p.cursorDate?.slice(0, 10) ?? "?"}   `,
-      );
-    },
-  });
+  let progress;
+  try {
+    progress = await crawl(db, {
+      maxPages,
+      from,
+      descending: recent,
+      onProgress: (p) => {
+        const seconds = (Date.now() - started) / 1000;
+        const rate = Math.round(p.entries / Math.max(seconds, 0.001));
+        process.stderr.write(
+          `\rсторінок ${p.pages} · записів ${p.entries} · нових ${p.inserted} · ${rate}/с · до ${p.cursorDate?.slice(0, 10) ?? "?"}   `,
+        );
+      },
+    });
+  } catch (error) {
+    process.stderr.write("\n");
+    console.error(`помилка: ${error instanceof Error ? error.message : error}`);
+    db.close();
+    process.exit(1);
+  }
 
   process.stderr.write("\n");
   console.error(

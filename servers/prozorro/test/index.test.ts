@@ -29,18 +29,28 @@ type Entry = {
   };
 };
 
-const entry = (n: number, overrides: Partial<Entry> = {}): Entry => ({
-  id: `id-${n}`,
-  tenderID: `UA-2026-08-${String(n).padStart(2, "0")}-000001-a`,
-  dateModified: `2026-08-${String(n).padStart(2, "0")}T10:00:00+03:00`,
-  status: "complete",
-  procuringEntity: {
-    name: "Сільська рада",
-    identifier: { id: "12345678" },
-    address: { region: "Одеська область" },
-  },
-  ...overrides,
-});
+const entry = (
+  n: number,
+  dateOrOverrides?: string | Partial<Entry>,
+  overrides: Partial<Entry> = {},
+): Entry => {
+  const dateOverride =
+    typeof dateOrOverrides === "string" ? { dateModified: `${dateOrOverrides}T10:00:00+03:00` } : {};
+  const rest = typeof dateOrOverrides === "object" ? dateOrOverrides : overrides;
+  return {
+    id: `id-${n}`,
+    tenderID: `UA-2026-08-${String(n).padStart(2, "0")}-000001-a`,
+    dateModified: `2026-08-${String(n).padStart(2, "0")}T10:00:00+03:00`,
+    status: "complete",
+    procuringEntity: {
+      name: "Сільська рада",
+      identifier: { id: "12345678" },
+      address: { region: "Одеська область" },
+    },
+    ...dateOverride,
+    ...rest,
+  };
+};
 
 /**
  * A feed that hands out prepared pages and remembers how it was called.
@@ -177,6 +187,49 @@ describe("crawl", () => {
       readState(db, "crawl_cursor"),
       null,
       "режими перетерли курсори один одного",
+    );
+  });
+
+  it("відмовляється стрибати вперед через --from, губивши непройдену історію", async () => {
+    // The real incident: `crawl --from=2026-07-01` on a cursor still at ~2017
+    // silently abandoned eight years of history. Nothing deleted existing rows,
+    // but no later run ever went back to fill the gap, because the saved cursor
+    // now claimed to be caught up.
+    const { fetchPage } = fakeFeed([[entry(1, "2020-01-01")]]);
+    await crawl(db, { fetchPage, delayMs: 0, pageSize: 1, maxPages: 1 });
+
+    await assert.rejects(
+      () => crawl(db, { fetchPage, delayMs: 0, from: "2026-07-01" }),
+      /стрибає вперед/,
+      "дозволив тихо перескочити збережений курсор уперед",
+    );
+  });
+
+  it("дозволяє --from назад або на той самий момент", async () => {
+    const { fetchPage } = fakeFeed([[entry(1, "2020-01-01")]]);
+    await crawl(db, { fetchPage, delayMs: 0, pageSize: 1, maxPages: 1 });
+
+    // Re-crawling from an earlier or equal date is exactly the recovery move,
+    // so it must not be blocked by the same guard that stops jumping forward.
+    await assert.doesNotReject(() =>
+      crawl(db, { fetchPage, delayMs: 0, from: "2015-01-01", maxPages: 1 }),
+    );
+  });
+
+  it("не блокує --from у режимі recent", async () => {
+    // The guard only protects the forward/history cursor: recent mode walks
+    // backward by design, so an explicit --from there is not a regression risk.
+    const { fetchPage } = fakeFeed([[entry(1, "2020-01-01")]]);
+    await crawl(db, {
+      fetchPage,
+      delayMs: 0,
+      pageSize: 1,
+      maxPages: 1,
+      descending: true,
+    });
+
+    await assert.doesNotReject(() =>
+      crawl(db, { fetchPage, delayMs: 0, from: "2026-07-01", descending: true, maxPages: 1 }),
     );
   });
 

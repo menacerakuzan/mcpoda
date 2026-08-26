@@ -120,7 +120,26 @@ export async function crawl(
   // The two directions keep separate cursors: mixing them would make each one
   // skip whatever the other had already passed.
   const cursorKey = descending ? "crawl_cursor_recent" : "crawl_cursor";
-  let cursor = from ?? readState(db, cursorKey) ?? undefined;
+  const saved = readState(db, cursorKey);
+  const savedDate = readState(db, `${cursorKey}_date`);
+
+  // An explicit --from silently overwrites whatever progress `saved` represents.
+  // This bit us for real: a one-off `crawl --from=2026-07-01` mid-session jumped
+  // the forward cursor from ~2017 to mid-2026, abandoning eight years of history
+  // that no later run ever went back to fill in. insert-or-ignore never deletes,
+  // so nothing was corrupted — the gap just silently stopped being crawled.
+  if (from && savedDate && !descending && new Date(from) > new Date(savedDate)) {
+    throw new Error(
+      [
+        `--from=${from} стрибає вперед відносно збереженого курсора (${savedDate.slice(0, 10)}).`,
+        "Це відкине непройдену історію між ними, і жоден майбутній запуск туди не повернеться сам.",
+        "Якщо це навмисно, спершу очистіть курсор: видаліть crawl_cursor у таблиці state,",
+        "або скористайтесь окремим PROYAV_DB для тестового індексу.",
+      ].join(" "),
+    );
+  }
+
+  let cursor = from ?? saved ?? undefined;
   const progress: CrawlProgress = {
     pages: 0,
     entries: 0,
