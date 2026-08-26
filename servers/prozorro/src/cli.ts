@@ -2,6 +2,7 @@
 import { catchUp, crawl } from "./index/crawl.js";
 import { enrich } from "./index/enrich.js";
 import { databasePath, indexStats, openDatabase } from "./index/db.js";
+import { SourceError } from "./http.js";
 
 /** Operator commands. The MCP server itself never crawls: it only reads. */
 
@@ -26,25 +27,54 @@ if (command === "crawl") {
     from ? `починаємо з ${from}` : "продовжуємо з збереженого курсора",
   );
 
+  // A single crawl run is meant to go for hours unattended, and http.ts already
+  // retries a request three times before giving up. That was not enough: a real
+  // overnight run died after twelve million requests on one network blip that
+  // outlasted those three retries. Network failures (SourceError) get the crawl
+  // itself restarted from the saved cursor, with a growing pause between tries.
+  // A validation error — the --from guard below — is not transient and must
+  // surface immediately instead of retrying forever against a mistake.
   let progress;
-  try {
-    progress = await crawl(db, {
-      maxPages,
-      from,
-      descending: recent,
-      onProgress: (p) => {
-        const seconds = (Date.now() - started) / 1000;
-        const rate = Math.round(p.entries / Math.max(seconds, 0.001));
-        process.stderr.write(
-          `\rсторінок ${p.pages} · записів ${p.entries} · нових ${p.inserted} · ${rate}/с · до ${p.cursorDate?.slice(0, 10) ?? "?"}   `,
-        );
-      },
-    });
-  } catch (error) {
-    process.stderr.write("\n");
-    console.error(`помилка: ${error instanceof Error ? error.message : error}`);
-    db.close();
-    process.exit(1);
+  let attempt = 0;
+  // Only cleared once a page has actually committed: crawl() persists the
+  // cursor after every successful page, so from that point the saved cursor
+  // already carries this run's progress and re-sending --from would restart
+  // it from scratch on every retry. But if the very first page fails before
+  // anything commits, the saved cursor is still the old pre-run one — keeping
+  // --from here is what makes the retry honour what was actually asked for.
+  let progressed = false;
+  for (;;) {
+    try {
+      progress = await crawl(db, {
+        maxPages,
+        from: progressed ? undefined : from,
+        descending: recent,
+        onProgress: (p) => {
+          progressed = true;
+          const seconds = (Date.now() - started) / 1000;
+          const rate = Math.round(p.entries / Math.max(seconds, 0.001));
+          process.stderr.write(
+            `\rсторінок ${p.pages} · записів ${p.entries} · нових ${p.inserted} · ${rate}/с · до ${p.cursorDate?.slice(0, 10) ?? "?"}   `,
+          );
+        },
+      });
+      break;
+    } catch (error) {
+      process.stderr.write("\n");
+
+      if (!(error instanceof SourceError)) {
+        console.error(`помилка: ${error instanceof Error ? error.message : error}`);
+        db.close();
+        process.exit(1);
+      }
+
+      attempt++;
+      const pause = Math.min(5_000 * 2 ** (attempt - 1), 5 * 60_000);
+      console.error(
+        `джерело недоступне (${error.message}), спроба ${attempt}, пауза ${Math.round(pause / 1000)} с`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, pause));
+    }
   }
 
   process.stderr.write("\n");

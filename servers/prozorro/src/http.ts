@@ -39,11 +39,16 @@ export async function requestJson<T>(
     });
   } catch (error) {
     if (error instanceof Error && error.name === "TimeoutError") {
-      throw new SourceError(
-        408,
-        url,
-        `Джерело не відповіло за ${TIMEOUT_MS} мс`,
-      );
+      // Found the hard way: an unbounded overnight crawl died after twelve
+      // million requests on a single timeout, because this branch threw
+      // immediately instead of going through the same retry path as a 503.
+      // A multi-hour job has to treat "no response yet" as exactly the kind
+      // of transient failure retries exist for.
+      if (attempt < 3) {
+        await sleep(400 * 2 ** attempt);
+        return requestJson<T>(url, init, attempt + 1);
+      }
+      throw new SourceError(408, url, `Джерело не відповіло за ${TIMEOUT_MS} мс`);
     }
     throw error;
   }
