@@ -28,6 +28,8 @@ export function LiquidMetalButton({ children, href, onClick, className = "" }: P
   const mount = useRef<ShaderMount | null>(null);
   const idle = useRef(IDLE_SPEED);
   const [pressed, setPressed] = useState(false);
+  /** Set when WebGL is unavailable or the shader refuses to compile. */
+  const [plain, setPlain] = useState(false);
 
   useEffect(() => {
     const host = shaderHost.current;
@@ -36,35 +38,45 @@ export function LiquidMetalButton({ children, href, onClick, className = "" }: P
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)");
     idle.current = calm.matches ? CALM_SPEED : IDLE_SPEED;
 
-    const instance = new ShaderMount(
-      host,
-      liquidMetalFragmentShader,
-      {
-        u_colorBack: getShaderColorFromString("#132a6b"),
-        u_colorTint: getShaderColorFromString("#8fb0ff"),
-        u_image: undefined,
-        u_isImage: false,
-        u_repetition: 3.4,
-        u_softness: 0.62,
-        u_shiftRed: 0.28,
-        u_shiftBlue: 0.34,
-        u_contour: 0.42,
-        u_distortion: 0.12,
-        u_angle: 42,
-        u_shape: 0,
-        u_fit: 2,
-        u_scale: 0.9,
-        u_rotation: 0,
-        u_originX: 0.5,
-        u_originY: 0.5,
-        u_offsetX: 0.08,
-        u_offsetY: -0.08,
-        u_worldWidth: 0,
-        u_worldHeight: 0,
-      },
-      undefined,
-      idle.current,
-    );
+    // A browser that cannot give us WebGL — an old Safari, a machine with the
+    // GPU blocked, a user in a low-power mode — must still get a button that
+    // looks deliberate rather than an empty rim, and the failure must not take
+    // the rest of the effect down with it.
+    let instance: ShaderMount;
+    try {
+      instance = new ShaderMount(
+        host,
+        liquidMetalFragmentShader,
+        {
+          u_colorBack: getShaderColorFromString("#132a6b"),
+          u_colorTint: getShaderColorFromString("#8fb0ff"),
+          u_image: undefined,
+          u_isImage: false,
+          u_repetition: 3.4,
+          u_softness: 0.62,
+          u_shiftRed: 0.28,
+          u_shiftBlue: 0.34,
+          u_contour: 0.42,
+          u_distortion: 0.12,
+          u_angle: 42,
+          u_shape: 0,
+          u_fit: 2,
+          u_scale: 0.9,
+          u_rotation: 0,
+          u_originX: 0.5,
+          u_originY: 0.5,
+          u_offsetX: 0.08,
+          u_offsetY: -0.08,
+          u_worldWidth: 0,
+          u_worldHeight: 0,
+        },
+        undefined,
+        idle.current,
+      );
+    } catch {
+      setPlain(true);
+      return;
+    }
 
     mount.current = instance;
 
@@ -118,7 +130,17 @@ export function LiquidMetalButton({ children, href, onClick, className = "" }: P
       }}
     >
       {/* the metal lives in the rim; the face stays dark so the label keeps its contrast */}
-      <span ref={shaderHost} className="shader-pill absolute inset-0 rounded-full" />
+      <span
+        ref={shaderHost}
+        className="shader-pill absolute inset-0 rounded-full"
+        // Without WebGL the rim would be empty and the button would read as
+        // broken, so it falls back to a static sheen in the same colours.
+        style={
+          plain
+            ? { background: "linear-gradient(135deg, #2d4a9e 0%, #8fb0ff 45%, #132a6b 100%)" }
+            : undefined
+        }
+      />
       <span
         className="pointer-events-none absolute inset-[1.5px] rounded-full"
         style={{

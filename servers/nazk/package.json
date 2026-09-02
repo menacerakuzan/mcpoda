@@ -1,12 +1,14 @@
 {
   "name": "@proyav/nazk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP-сервер до Єдиного державного реєстру декларацій НАЗК",
   "scripts": {
     "build": "tsc",
     "test": "npm run build && node --test test/*.test.ts",
     "test:contract": "npm run build && node --test test/live/*.test.ts",
     "smoke": "npm run build && node scripts/smoke.mjs",
+    "serve": "npm run build && node dist/serve.js",
+    "smoke:http": "npm run build && node scripts/smoke-http.mjs",
     "prepublishOnly": "npm run build && npm test"
   },
   "author": "",
@@ -21,7 +23,9 @@
     "typescript": "^7.0.2"
   },
   "bin": {
-    "proyav-nazk": "dist/index.js"
+    "nazk": "dist/index.js",
+    "proyav-nazk": "dist/index.js",
+    "proyav-nazk-serve": "dist/serve.js"
   },
   "files": [
     "dist",

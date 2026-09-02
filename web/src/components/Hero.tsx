@@ -16,6 +16,15 @@ export function Hero() {
   useEffect(() => {
     const el = video.current;
     if (!el) return;
+
+    // React sets `muted` as a DOM property and never writes the attribute, but
+    // Safari decides whether autoplay is allowed by looking at the attribute on
+    // the element. Confirmed on this page in WebKit: the property was true and
+    // the attribute absent. Setting both is what keeps Safari from treating an
+    // already-silent video as one that needs a click.
+    el.muted = true;
+    el.setAttribute("muted", "");
+
     const kick = () => void el.play().catch(() => {});
     el.addEventListener("canplay", kick);
     el.addEventListener("stalled", kick);
@@ -79,7 +88,7 @@ export function Hero() {
             className="anim-fade-up mt-7 max-w-[300px] text-[15px] leading-relaxed text-[#c6cad0] sm:max-w-[420px] sm:text-[17px]"
             style={{ animationDelay: "550ms" }}
           >
-            Два MCP-сервери під'єднують Prozorro і НАЗК до вашого ШІ-асистента. П'ять рядків
+            Три MCP-сервери під'єднують Prozorro, НАЗК і ЄДР до вашого ШІ-асистента. П'ять рядків
             у налаштуваннях, далі просто питайте звичайними словами.
           </p>
         </div>

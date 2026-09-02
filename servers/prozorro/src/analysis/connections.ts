@@ -45,7 +45,8 @@ export type SignalKind =
   | "shared_mail_domain"
   | "shared_address"
   | "shared_contact_person"
-  | "close_submission";
+  | "close_submission"
+  | "shared_person_edr";
 
 export type Signal = {
   kind: SignalKind;
@@ -234,6 +235,47 @@ export function findSignals(bidders: Bidder[]): Signal[] {
   }
 
   return signals;
+}
+
+/**
+ * Adds the one signal that does not come from the tender document: two bidders
+ * sharing a founder, director or beneficiary in the register of legal entities.
+ *
+ * Kept separate from findSignals on purpose. Everything above is derived from
+ * the record in hand and always works; this needs a second index that may not
+ * be installed, so it is an addition the caller makes when it can, not a
+ * dependency the core check carries.
+ */
+export function findRegisterSignals(
+  bidders: Bidder[],
+  overlaps: Array<{ a: string; b: string; name: string; roleA: string; roleB: string }>,
+): Signal[] {
+  const byCode = new Map<string, Bidder>();
+  for (const bidder of bidders) {
+    if (bidder.edrpou) byCode.set(bidder.edrpou, bidder);
+  }
+
+  return overlaps.flatMap((overlap) => {
+    const a = byCode.get(overlap.a);
+    const b = byCode.get(overlap.b);
+    if (!a || !b) return [];
+
+    const roles =
+      overlap.roleA === overlap.roleB
+        ? `${overlap.roleA} в обох`
+        : `${overlap.roleA} в одній, ${overlap.roleB} в іншій`;
+
+    return [
+      {
+        kind: "shared_person_edr" as const,
+        between: [label(a), label(b)] as [string, string],
+        detail: `Спільна особа в ЄДР: ${overlap.name} — ${roles}`,
+        innocent:
+          "Це збіг за прізвищем та іменем, а не за особою: масове вивантаження реєстру не містить ідентифікатора фізособи, тому двоє однофамільців без жодного стосунку одне до одного дають такий самий збіг. Навіть якщо це справді одна людина, володіти двома фірмами законно, а участь обох у торгах могла бути незалежною.",
+        weight: 4,
+      },
+    ];
+  });
 }
 
 export type Competition = {

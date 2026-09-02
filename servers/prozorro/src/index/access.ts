@@ -7,7 +7,7 @@ import {
   type IndexStats,
   SchemaMismatch,
 } from "./db.js";
-import { lookupByTenderId, searchIndex, type IndexSearch } from "./queries.js";
+import { lookupByTenderId, monitoringsFor, searchIndex, type IndexSearch } from "./queries.js";
 import { benchmark } from "../analysis/benchmark.js";
 import { aggregate, compareBuyers } from "../analysis/aggregate.js";
 
@@ -34,6 +34,7 @@ export type Index = {
     options: Parameters<typeof compareBuyers>[1],
   ): ReturnType<typeof compareBuyers>;
   search(query: IndexSearch): ReturnType<typeof searchIndex>;
+  monitorings(tenderUuid: string): ReturnType<typeof monitoringsFor>;
   close(): void;
 };
 
@@ -60,12 +61,13 @@ export function getIndex(): Index | null {
 
   cached = {
     path,
-    stats: () => indexStats(db),
+    stats: () => indexStats(db, { cached: true }),
     lookup: (tenderID) => lookupByTenderId(db, tenderID),
     benchmark: (options) => benchmark(db, options),
     aggregate: (options) => aggregate(db, options),
     compareBuyers: (options) => compareBuyers(db, options),
     search: (query) => searchIndex(db, query),
+    monitorings: (tenderUuid) => monitoringsFor(db, tenderUuid),
     close: () => db.close(),
   };
   return cached;

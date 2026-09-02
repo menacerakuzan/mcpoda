@@ -196,9 +196,9 @@ export function Asks() {
 type Stat = { value: number; decimals: number; prefix?: string; suffix?: string; label: string };
 
 const stats: Stat[] = [
-  { value: 15, decimals: 0, suffix: "M+", label: "закупівель у локальному індексі" },
+  { value: 30, decimals: 0, suffix: "M+", label: "закупівель у локальному індексі" },
   { value: 2015, decimals: 0, label: "рік, з якого доступні дані" },
-  { value: 2, decimals: 0, label: "MCP-сервери: Prozorro і НАЗК" },
+  { value: 3, decimals: 0, label: "MCP-сервери: Prozorro, НАЗК, ЄДР" },
   { value: 0, decimals: 0, suffix: " ₴", label: "вартість, без реєстрації" },
 ];
 
@@ -343,7 +343,7 @@ export function Footer() {
           <div className="flex items-start gap-3">
             <Mark className="mt-0.5 size-5 shrink-0 text-dim" />
             <p className="max-w-[52ch]">
-              Департамент цифрового розвитку, інформаційної політики та кіберзахисту Одеської
+              Департамент цифрового розвитку, інформаційної політики та туризму Одеської
               обласної державної адміністрації
             </p>
           </div>

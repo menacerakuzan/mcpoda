@@ -38,12 +38,25 @@ export async function requestJson<T>(
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (error) {
-    if (error instanceof Error && error.name === "TimeoutError") {
-      throw new SourceError(
-        408,
-        url,
-        `Джерело не відповіло за ${TIMEOUT_MS} мс`,
-      );
+    // Two failure shapes land here and both are transient: TimeoutError, and
+    // the plain `TypeError: fetch failed` Node/undici throws for DNS blips
+    // and dropped connections. Neither retried here until 27.08.2026, when
+    // the same gap killed an unattended Prozorro crawl mid-run — this server
+    // hits the live register on every single call, so it is exposed to the
+    // same blip with no index to fall back on. Anything else is rethrown.
+    const isTimeout = error instanceof Error && error.name === "TimeoutError";
+    const isNetworkFailure =
+      error instanceof TypeError && error.message === "fetch failed";
+
+    if (isTimeout || isNetworkFailure) {
+      if (attempt < 3) {
+        await sleep(400 * 2 ** attempt);
+        return requestJson<T>(url, init, attempt + 1);
+      }
+      const reason = isTimeout
+        ? `Джерело не відповіло за ${TIMEOUT_MS} мс`
+        : `Мережева помилка: ${(error as Error & { cause?: unknown }).cause ?? (error as Error).message}`;
+      throw new SourceError(isTimeout ? 408 : 0, url, reason);
     }
     throw error;
   }

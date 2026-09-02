@@ -75,8 +75,39 @@ describe("aggregate", () => {
     tender({ n: 2, daysAgo: 2, amount: 20 });
     tender({ n: 3, daysAgo: 400, amount: 30 });
 
-    const result = aggregate(db, { dimension: "month" });
+    // Explicit period: without one the default window would leave the older
+    // procedure out, and this test is about grouping, not about the window.
+    const result = aggregate(db, { dimension: "month", from: "2000-01-01" });
     assert.equal(result.rows.length, 2, "процедури з різних років злились в один рядок");
+  });
+
+  it("без періоду бере останні місяці, а не всю історію", () => {
+    // Summing everything ever indexed took 288 seconds on the real index and
+    // returned the least trustworthy number available: coverage across eleven
+    // years is a few percent. A missing period now means the recent past.
+    tender({ n: 1, daysAgo: 1, amount: 10 });
+    tender({ n: 2, daysAgo: 400, amount: 999 });
+
+    const result = aggregate(db, { dimension: "month" });
+
+    assert.equal(result.totals.procedures, 1, "у підсумок потрапила процедура поза вікном");
+    assert.ok(
+      result.caveats.some((c) => /Період не задано/.test(c)),
+      "вікно підставлено мовчки, без попередження",
+    );
+  });
+
+  it("не підставляє вікно, коли період задано явно", () => {
+    tender({ n: 1, daysAgo: 1, amount: 10 });
+    tender({ n: 2, daysAgo: 400, amount: 999 });
+
+    const result = aggregate(db, { dimension: "month", from: "2000-01-01" });
+
+    assert.equal(result.totals.procedures, 2);
+    assert.ok(
+      !result.caveats.some((c) => /Період не задано/.test(c)),
+      "попередження про вікно з'явилось там, де період задано",
+    );
   });
 
   it("застосовує фільтри до вибірки", () => {
@@ -102,6 +133,23 @@ describe("aggregate", () => {
     assert.equal(result.coverage.inWindow, 10);
     assert.ok(result.coverage.note, "неповне покриття лишилось без попередження");
     assert.match(result.coverage.note!, /нижня межа/);
+  });
+
+  it("не дає назвати підсумком те, де суму має мізерна частка", () => {
+    // The real index measured 27.08.2026: 4 500 amounts across 30 033 519
+    // rows. At that ratio the old wording ("нижня межа") was too mild — it
+    // still invites presenting the number as a total — and the share itself
+    // rounded to 0.000, which reads as no data rather than a thin slice.
+    // The ratio has to be as thin as production (1 : 6 674) — at 1 : 100 the
+    // old toFixed(3) still shows 0.010 and the bug hides.
+    tender({ n: 1, amount: 1000 });
+    for (let i = 2; i <= 3000; i++) tender({ n: i, amount: null });
+
+    const result = aggregate(db, { dimension: "buyer" });
+
+    assert.ok(result.coverage.share > 0, "частка округлилась у нуль і перестала щось означати");
+    assert.ok(result.coverage.note, "мізерне покриття лишилось без попередження");
+    assert.match(result.coverage.note!, /надто мало/);
   });
 
   it("мовчить про покриття, коли воно повне", () => {

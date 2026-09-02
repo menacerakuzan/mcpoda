@@ -95,7 +95,7 @@ export function MobileMenu({ open, onClose }: { open: boolean; onClose: () => vo
                 Підключити за 2 хвилини
               </a>
               <p className="mt-5 text-[13px] leading-relaxed text-dim">
-                Департамент цифрового розвитку, інформаційної політики та кіберзахисту Одеської
+                Департамент цифрового розвитку, інформаційної політики та туризму Одеської
                 обласної державної адміністрації
               </p>
             </motion.div>

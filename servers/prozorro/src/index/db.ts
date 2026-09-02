@@ -64,6 +64,13 @@ create index if not exists tenders_modified on tenders(modified);
 create index if not exists tenders_buyer on tenders(buyer_edrpou);
 create index if not exists tenders_pending on tenders(modified) where enriched_at is null;
 
+-- Price comparison looks for procedures with the same CPV inside a date window.
+-- Without this it walked the date range and tested the code row by row, which on
+-- a 550-day window over thirty million rows is what made proyav_price_benchmark
+-- time out in production. Partial on purpose: only enriched rows have a CPV at
+-- all, so the index stays a fraction of the table's size.
+create index if not exists tenders_cpv on tenders(cpv, modified) where cpv is not null;
+
 -- external content: the virtual table reads from tenders, so titles are stored once
 create virtual table if not exists tenders_fts using fts5(
   title,
@@ -91,6 +98,29 @@ create table if not exists state (
   key    text primary key,
   value  text
 );
+
+-- Держаудитслужба monitorings, keyed to the procedure they concern.
+--
+-- A separate table rather than columns on the tenders table, because one
+-- be monitored more than once and because this fills in independently: the
+-- audit feed is its own crawl against its own host. Purely additive, so an
+-- index built before this existed simply gains an empty table on next open.
+create table if not exists monitorings (
+  id                 text primary key,
+  monitoring_id      text,
+  tender_id          text,
+  status             text,
+  reasons            text,
+  violation_occurred integer,
+  violation_type     text,
+  description        text,
+  started_at         integer,
+  modified           integer not null
+);
+
+create index if not exists monitorings_tender on monitorings(tender_id);
+create index if not exists monitorings_modified on monitorings(modified);
+create index if not exists monitorings_pending on monitorings(modified) where description is null;
 `;
 
 export class SchemaMismatch extends Error {
@@ -194,23 +224,68 @@ export type IndexStats = {
   /** How far the backward pass from the head has reached. */
   recentCursorDate: string | null;
   updatedAt: string | null;
+  /** When the two counts above were last measured. */
+  countsMeasuredAt?: string | null;
 };
 
-export function indexStats(db: DatabaseSync): IndexStats {
-  const counts = db
+/**
+ * The two counts that cost a full pass, remembered between runs.
+ *
+ * SQLite keeps no row count, so `count(*)` over thirty million rows is tens of
+ * seconds — enough to make proyav_index_status time out in production even
+ * after every other query was made cheap. But these numbers only change when a
+ * crawl or an enrichment pass runs, and those passes end anyway: so each one
+ * records the result, and the tool reads it instantly.
+ *
+ * The stored value carries the moment it was measured, and callers show that
+ * rather than implying the number is live.
+ */
+export function recordCounts(db: DatabaseSync) {
+  const row = db
     .prepare(
       `select count(*) as tenders,
-              sum(case when enriched_at is not null then 1 else 0 end) as enriched,
-              min(modified) as oldest,
-              max(modified) as newest
+              sum(case when enriched_at is not null then 1 else 0 end) as enriched
        from tenders`,
     )
-    .get() as {
-    tenders: number;
-    enriched: number | null;
-    oldest: number | null;
-    newest: number | null;
-  };
+    .get() as { tenders: number; enriched: number | null };
+
+  writeState(db, "count_tenders", String(row.tenders));
+  writeState(db, "count_enriched", String(row.enriched ?? 0));
+  writeState(db, "counts_measured_at", new Date().toISOString());
+  return row;
+}
+
+function storedCounts(db: DatabaseSync) {
+  const tenders = readState(db, "count_tenders");
+  const enriched = readState(db, "count_enriched");
+  const at = readState(db, "counts_measured_at");
+  if (tenders === null || enriched === null) return null;
+  return { tenders: Number(tenders), enriched: Number(enriched), measuredAt: at };
+}
+
+/**
+ * @param cached  Serve the counts recorded by the last crawl or enrichment
+ *   pass instead of counting again. A fresh count over thirty million rows
+ *   costs tens of seconds, which is what made proyav_index_status time out —
+ *   but a stored number goes stale the moment anything writes, so this is
+ *   opt-in and never the default. Read-only callers that show the measurement
+ *   time alongside the number want it; anything that has just changed the
+ *   table does not.
+ */
+export function indexStats(db: DatabaseSync, { cached = false } = {}): IndexStats {
+  const stored = cached ? storedCounts(db) : null;
+  const counts = stored ?? recordCounts(db);
+  const measuredAt = stored?.measuredAt ?? new Date().toISOString();
+
+  // The period, on the other hand, is free — as long as each end is asked for
+  // separately. One statement with both min() and max() gives up the index
+  // seek and scans instead: 17 593 ms versus 0 ms on the real index.
+  const oldest = (
+    db.prepare("select min(modified) as v from tenders").get() as { v: number | null }
+  ).v;
+  const newest = (
+    db.prepare("select max(modified) as v from tenders").get() as { v: number | null }
+  ).v;
 
   const { buyers } = db.prepare("select count(*) as buyers from buyers").get() as {
     buyers: number;
@@ -220,10 +295,11 @@ export function indexStats(db: DatabaseSync): IndexStats {
     tenders: counts.tenders,
     enriched: counts.enriched ?? 0,
     buyers,
-    oldest: counts.oldest ? fromEpoch(counts.oldest) : null,
-    newest: counts.newest ? fromEpoch(counts.newest) : null,
+    oldest: oldest ? fromEpoch(oldest) : null,
+    newest: newest ? fromEpoch(newest) : null,
     historyCursorDate: readState(db, "crawl_cursor_date"),
     recentCursorDate: readState(db, "crawl_cursor_recent_date"),
     updatedAt: readState(db, "crawl_updated_at"),
+    countsMeasuredAt: measuredAt,
   };
 }

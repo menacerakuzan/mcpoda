@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   findSignals,
+  findRegisterSignals,
   mailDomain,
   normalizeAddress,
   normalizePhone,
@@ -149,10 +150,24 @@ describe("сигнали", () => {
   });
 
   it("жоден сигнал не звинувачує", () => {
-    const signals = findSignals([
-      bidder({ edrpou: "1", phone: "0971112233", contactName: "Іван" }),
-      bidder({ edrpou: "2", phone: "0971112233", contactName: "Іван" }),
-    ]);
+    const signals = [
+      ...findSignals([
+        bidder({ edrpou: "1", phone: "0971112233", contactName: "Іван" }),
+        bidder({ edrpou: "2", phone: "0971112233", contactName: "Іван" }),
+      ]),
+      ...findRegisterSignals(
+        [bidder({ edrpou: "1" }), bidder({ edrpou: "2" })],
+        [{ a: "1", b: "2", name: "ІВАНЕНКО ІВАН", roleA: "засновник", roleB: "керівник" }],
+      ),
+    ];
+
+    // The point is coverage of kinds, not a count: the register signal is the
+    // newest and most quotable one, so it must be inside what gets checked.
+    assert.ok(
+      signals.some((s) => s.kind === "shared_person_edr"),
+      "сигнал із реєстру не потрапив у перевірку на звинувачувальну лексику",
+    );
+    assert.ok(signals.length >= 3, "перевірка пройшла по надто малій вибірці сигналів");
 
     for (const signal of signals) {
       assert.doesNotMatch(
@@ -161,6 +176,61 @@ describe("сигнали", () => {
         `сигнал ${signal.kind} перетворився на звинувачення`,
       );
     }
+  });
+});
+
+describe("сигнали з реєстру ЄДР", () => {
+  const overlap = {
+    a: "1",
+    b: "2",
+    name: "ІВАНЕНКО ІВАН ІВАНОВИЧ",
+    roleA: "засновник",
+    roleB: "керівник",
+  };
+
+  it("перетворює спільну особу на сигнал між тими самими учасниками", () => {
+    const signals = findRegisterSignals(
+      [bidder({ edrpou: "1", name: "ТОВ АЛЬФА" }), bidder({ edrpou: "2", name: "ТОВ БЕТА" })],
+      [overlap],
+    );
+
+    assert.equal(signals.length, 1);
+    assert.equal(signals[0].kind, "shared_person_edr");
+    assert.match(signals[0].detail, /ІВАНЕНКО ІВАН ІВАНОВИЧ/);
+    assert.match(signals[0].detail, /засновник в одній, керівник в іншій/);
+  });
+
+  it("каже «в обох», коли роль однакова", () => {
+    const signals = findRegisterSignals(
+      [bidder({ edrpou: "1" }), bidder({ edrpou: "2" })],
+      [{ ...overlap, roleB: "засновник" }],
+    );
+    assert.match(signals[0].detail, /засновник в обох/);
+  });
+
+  it("завжди попереджає, що це збіг за іменем, а не за особою", () => {
+    // The single most important caveat this signal carries: the bulk export has
+    // no personal identifier, so namesakes are indistinguishable from owners.
+    const signals = findRegisterSignals(
+      [bidder({ edrpou: "1" }), bidder({ edrpou: "2" })],
+      [overlap],
+    );
+    assert.match(signals[0].innocent, /однофамільц|за прізвищем/i);
+  });
+
+  it("мовчить, коли збіг стосується учасника, якого немає в цьому тендері", () => {
+    const signals = findRegisterSignals(
+      [bidder({ edrpou: "1" }), bidder({ edrpou: "3" })],
+      [overlap],
+    );
+    assert.deepEqual(signals, [], "сигнал приписано учаснику, який не брав участі");
+  });
+
+  it("нічого не додає, коли реєстр не дав збігів", () => {
+    assert.deepEqual(
+      findRegisterSignals([bidder({ edrpou: "1" }), bidder({ edrpou: "2" })], []),
+      [],
+    );
   });
 });
 

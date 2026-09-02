@@ -1,0 +1,27 @@
+{
+  "name": "@proyav/gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Шлюз ПРОЯВ: один порт перед трьома MCP-серверами, маршрутизація за префіксом шляху",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "npm run build && node --test test/*.test.ts",
+    "serve": "npm run build && node dist/gateway.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/menacerakuzan/mcpoda.git",
+    "directory": "servers/gateway"
+  }
+}

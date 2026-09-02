@@ -86,10 +86,34 @@ const GROUPING: Record<Dimension, { key: string; label: string }> = {
   status: { key: "t.status", label: "t.status" },
 };
 
+/**
+ * How far back an aggregate reaches when nobody says.
+ *
+ * Measured on the real index (31.08.2026): summing every procedure ever
+ * indexed takes 288 seconds, a year takes 56, three months takes 3.5. An
+ * unbounded «скільки і на що йде» is also not a question anyone means
+ * literally — and its answer is the least trustworthy one available, because
+ * coverage across the whole eleven years is 4% against 30% for the last year.
+ * So a missing period means the recent past, and the answer says so.
+ */
+const DEFAULT_WINDOW_DAYS = 90;
+
+function withDefaultWindow<T extends Filters>(options: T): { options: T; defaulted: boolean } {
+  if (options.from || options.to) return { options, defaulted: false };
+
+  const from = new Date();
+  from.setUTCDate(from.getUTCDate() - DEFAULT_WINDOW_DAYS);
+  return {
+    options: { ...options, from: from.toISOString().slice(0, 10) },
+    defaulted: true,
+  };
+}
+
 export function aggregate(
   db: DatabaseSync,
-  options: Filters & { dimension: Dimension; limit?: number },
+  input: Filters & { dimension: Dimension; limit?: number },
 ): AggregateResult {
+  const { options, defaulted } = withDefaultWindow(input);
   const { sql, params } = where(options);
   const group = GROUPING[options.dimension];
   const limit = Math.min(Math.max(options.limit ?? 15, 1), 100);
@@ -131,6 +155,11 @@ export function aggregate(
     caveats: [
       "Суми це очікувана вартість процедур, а не сплачені кошти: після торгів і змін до договорів цифри інші.",
       "Рахується лише те, що вже є в локальному індексі. Якщо покриття неповне, суми занижені, а не помилкові.",
+      ...(defaulted
+        ? [
+            `Період не задано, тому взято останні ${DEFAULT_WINDOW_DAYS} днів. Ширший період рахується довше і має гірше покриття — задайте from і to явно, якщо потрібен саме він.`,
+          ]
+        : []),
     ],
   };
 }
@@ -169,9 +198,21 @@ export function coverage(
     )
     .get(...params) as { inWindow: number; withAmount: number | null };
 
-  const period = db
-    .prepare("select min(modified) as oldest, max(modified) as newest from tenders")
-    .get() as { oldest: number | null; newest: number | null };
+  // Deliberately two statements, not one.
+  //
+  // SQLite turns `select min(x) from t` into a single seek to the first entry
+  // of an index on x, and the same for max — but only when the query asks for
+  // one of them. Asking for both in one statement gives up that optimisation
+  // and scans the whole index instead. Measured on the real thirty-million-row
+  // index (31.08.2026): 17 593 ms together, 0 ms apart. That one line was
+  // enough to make every analytics tool time out in production.
+  const oldest = (
+    db.prepare("select min(modified) as v from tenders").get() as { v: number | null }
+  ).v;
+  const newest = (
+    db.prepare("select max(modified) as v from tenders").get() as { v: number | null }
+  ).v;
+  const period = { oldest, newest };
 
   const withAmount = row.withAmount ?? 0;
   const share = row.inWindow ? withAmount / row.inWindow : 0;
@@ -179,15 +220,21 @@ export function coverage(
   return {
     withAmount,
     inWindow: row.inWindow,
-    share: Number(share.toFixed(3)),
+    // Three decimals was enough while coverage was a rough fraction. Measured
+    // on the real index 27.08.2026 it is 0.00015, which toFixed(3) rounds to
+    // "0.000" — a number that reads as "no data at all" rather than "a very
+    // thin slice", and hides exactly the case the reader most needs to see.
+    share: Number(share.toPrecision(2)),
     indexPeriod: {
       oldest: period.oldest ? fromEpoch(period.oldest).slice(0, 10) : null,
       newest: period.newest ? fromEpoch(period.newest).slice(0, 10) : null,
     },
     note:
-      share < 0.5
-        ? `Сума порахована лише за ${withAmount} процедурами з ${row.inWindow}: решта ще не має суми в індексі. Це нижня межа, а не повна цифра.`
-        : undefined,
+      share < 0.05
+        ? `Увага: суму має лише ${withAmount} процедур із ${row.inWindow} у цій вибірці. Це надто мало, щоб називати результат обсягом закупівель — це сума кількох відомих процедур, і подавати її людині як підсумок не можна. Індекс ще збагачується.`
+        : share < 0.5
+          ? `Сума порахована лише за ${withAmount} процедурами з ${row.inWindow}: решта ще не має суми в індексі. Це нижня межа, а не повна цифра.`
+          : undefined,
   };
 }
 

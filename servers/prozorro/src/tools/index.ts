@@ -4,9 +4,19 @@ import { asJsonContent, money, projectHit, projectTender } from "../format.js";
 import { SourceError } from "../http.js";
 import { fetchFeedPage, fetchTender, tenderWebUrl } from "../sources/cdb.js";
 import { resolveTenderId } from "../resolve.js";
-import { getIndex, indexUnavailableReason } from "../index/access.js";
+import {
+  indexPresence,
+  lookup as indexLookup,
+  runBenchmark,
+  runAggregate,
+  runCompareBuyers,
+  search as indexSearch,
+  edrSharedPeople,
+  monitorings as indexMonitorings,
+  stats as indexStats,
+} from "../index/asyncIndex.js";
 import { checkTender } from "../analysis/check.js";
-import { benchmarkTender } from "../index/access.js";
+import { summarisePayments } from "../analysis/payments.js";
 import {
   searchTenders,
   SOURCE_PAGE_SIZE,
@@ -22,6 +32,9 @@ const NO_INDEX = {
 
 const SOURCE_NOTE =
   "Джерело: відкриті дані Prozorro. Сервер лише читає, нічого не змінює в реєстрі.";
+
+const EDATA_NOTE =
+  "Джерело: Є-data (spending.gov.ua), рух коштів через Державну казначейську службу. Сервер лише читає.";
 
 /**
  * A failing source is information, not a crash: the assistant can retry, narrow
@@ -216,6 +229,7 @@ export function registerTools(server: McpServer) {
         let outcome: Awaited<ReturnType<typeof resolveTenderId>> | null = null;
 
         let resolvedVia = "internal id";
+        const presence = /^[0-9a-f]{32}$/i.test(id) ? null : await indexPresence();
 
         if (/^[0-9a-f]{32}$/i.test(id)) {
           uuid = id;
@@ -223,7 +237,7 @@ export function registerTools(server: McpServer) {
           // The index turns the hardest lookup in the project into a primary key
           // hit. Without it, the feed scan only reaches procedures touched
           // recently, so an old one is simply unreachable.
-          const indexed = getIndex()?.lookup(id);
+          const indexed = presence?.present ? await indexLookup(id) : null;
           if (indexed) {
             uuid = indexed.id;
             resolvedVia = "локальний індекс";
@@ -242,7 +256,7 @@ export function registerTools(server: McpServer) {
                 : "not_found",
             message: [
               `Не вдалося знайти процедуру ${id}.`,
-              getIndex()
+              presence?.present
                 ? "Її немає ні в локальному індексі, ні у свіжій частині стрічки змін. Можливо, індекс ще не дійшов до цього періоду: перевірте proyav_index_status."
                 : "Локального індексу немає, а стрічка змін показує лише нещодавно змінені процедури. Побудуйте індекс, щоб знаходити давні процедури за номером.",
               "Спробуйте proyav_search_tenders, щоб перевірити номер, або відкрийте сторінку процедури вручну.",
@@ -304,8 +318,8 @@ export function registerTools(server: McpServer) {
     },
     async (args) =>
       guard(async () => {
-        const index = getIndex();
-        if (!index) {
+        const presence = await indexPresence();
+        if (!presence.present) {
           return asJsonContent({
             error: "no_index",
             message: [
@@ -316,16 +330,20 @@ export function registerTools(server: McpServer) {
           });
         }
 
-        const result = index.search(args);
+        const result = await indexSearch(args);
+        if (!result) return asJsonContent(NO_INDEX);
         return asJsonContent({
           query: args,
           total: result.total,
           returned: result.rows.length,
           coverage: {
-            share: Number(result.enrichedShare.toFixed(3)),
+            // Of the rows in this answer, not of the whole index: the
+            // index-wide figure costs a full scan and belongs in
+            // proyav_index_status.
+            shareOfReturned: Number(result.enrichedShare.toFixed(3)),
             note:
               result.enrichedShare < 0.5
-                ? "Назви та суми має менша частина індексу, тому пошук за словами бачить не все. Для повноти беріть proyav_search_tenders."
+                ? "Назву й суму має менша частина знайдених процедур: решта є в індексі лише службовими полями, тому пошук за словами їх не бачить. Для повноти беріть proyav_search_tenders, а стан індексу цілком — proyav_index_status."
                 : undefined,
           },
           results: result.rows.map((row) => ({
@@ -393,7 +411,7 @@ export function registerTools(server: McpServer) {
     },
     async ({ tenderID, windowDays, sampleSize }) =>
       guard(async () => {
-        const result = benchmarkTender({ tenderID, windowDays, sampleSize });
+        const result = await runBenchmark({ tenderID, windowDays, sampleSize });
         if (!result) {
           return asJsonContent({
             error: "no_index",
@@ -434,9 +452,9 @@ export function registerTools(server: McpServer) {
     },
     async (args) =>
       guard(async () => {
-        const index = getIndex();
-        if (!index) return asJsonContent(NO_INDEX);
-        return asJsonContent({ ...index.aggregate(args), source: SOURCE_NOTE });
+        const result = await runAggregate(args);
+        if (!result) return asJsonContent(NO_INDEX);
+        return asJsonContent({ ...result, source: SOURCE_NOTE });
       }),
   );
 
@@ -471,9 +489,9 @@ export function registerTools(server: McpServer) {
     },
     async (args) =>
       guard(async () => {
-        const index = getIndex();
-        if (!index) return asJsonContent(NO_INDEX);
-        return asJsonContent({ ...index.compareBuyers(args), source: SOURCE_NOTE });
+        const result = await runCompareBuyers(args);
+        if (!result) return asJsonContent(NO_INDEX);
+        return asJsonContent({ ...result, source: SOURCE_NOTE });
       }),
   );
 
@@ -510,7 +528,8 @@ export function registerTools(server: McpServer) {
         if (/^[0-9a-f]{32}$/i.test(id)) {
           uuid = id;
         } else {
-          const indexed = getIndex()?.lookup(id);
+          const presence = await indexPresence();
+          const indexed = presence.present ? await indexLookup(id) : null;
           if (indexed) uuid = indexed.id;
           else {
             const outcome = await resolveTenderId(id);
@@ -527,7 +546,60 @@ export function registerTools(server: McpServer) {
         }
 
         const tender = await fetchTender(uuid);
-        return asJsonContent({ ...checkTender(tender), source: SOURCE_NOTE });
+        // The register lookup is the one part of this check that reaches
+        // outside the tender record. It is best-effort: no ЄДР index means no
+        // extra signal, never a failed check.
+        const codes = ((tender.bids as Array<{ tenderers?: Array<{ identifier?: { id?: string } }> }> | undefined) ?? [])
+          .map((bid) => bid.tenderers?.[0]?.identifier?.id)
+          .filter((code): code is string => Boolean(code));
+
+        const overlaps = codes.length >= 2 ? await edrSharedPeople(codes) : [];
+        // The audit lookup is by the internal uuid, which is what we resolved
+        // above — and it is cheap: an indexed read of a small table.
+        const audit = await indexMonitorings(uuid);
+
+        return asJsonContent({
+          ...checkTender(tender, overlaps, audit),
+          source: SOURCE_NOTE,
+        });
+      }),
+  );
+
+
+  server.registerTool(
+    "proyav_payments",
+    {
+      title: "Фактичні платежі казначейства",
+      description: [
+        "Скільки грошей організація насправді отримала або витратила — за даними Є-data,",
+        "тобто за рухом коштів через Державну казначейську службу.",
+        "",
+        "Це відповідь на питання, якого не дає Prozorro. Там є очікувана вартість і сума",
+        "договору; тут — що реально пішло з рахунку. Різниця буває суттєвою: договір може",
+        "бути виконаний частково, оплачений авансом або тягнутись роками.",
+        "",
+        "side=recipient — скільки отримала фірма (найчастіше саме це і питають про переможця",
+        "тендера). side=payer — скільки витратив замовник.",
+        "",
+        "Обмеження джерела, які варто переказувати людині разом із цифрою:",
+        "платіж може бути авансом або оплатою за старим договором, тому сума за період",
+        "не дорівнює вартості робіт цього періоду;",
+        "організації, що не обслуговуються в казначействі, тут не видно взагалі;",
+        "джерело віддає максимум 92 дні за запит, довший період сервер набирає вікнами.",
+      ].join("\n"),
+      inputSchema: {
+        edrpou: z.string().min(8).max(10).describe("Код ЄДРПОУ організації."),
+        side: z
+          .enum(["recipient", "payer"])
+          .describe("recipient — скільки отримала, payer — скільки витратила."),
+        from: z.string().describe("Дата від, РРРР-ММ-ДД."),
+        to: z.string().describe("Дата до, РРРР-ММ-ДД."),
+      },
+    },
+    async ({ edrpou, side, from, to }) =>
+      guard(async () => {
+        const summary = await summarisePayments({ edrpou, side, from, to });
+        return asJsonContent({ ...summary, source: EDATA_NOTE });
       }),
   );
 
@@ -544,30 +616,49 @@ export function registerTools(server: McpServer) {
     },
     async () =>
       guard(async () => {
-        const index = getIndex();
-        if (!index) {
+        const presence = await indexPresence();
+        if (!presence.present) {
           return asJsonContent({
             present: false,
             message:
-              indexUnavailableReason() ??
+              presence.unavailableReason ??
               "Індексу немає. Побудувати: npx proyav-prozorro crawl --recent, далі npx proyav-prozorro enrich.",
           });
         }
 
-        const stats = index.stats();
+        const stats = await indexStats();
+        if (!stats) return asJsonContent(NO_INDEX);
+
+        // The two crawls walk toward each other: history forward from 2015,
+        // recent backward from the head. Once the forward pass overtakes the
+        // backward one, the recent cursor stops describing anything — it just
+        // marks where a pass that is no longer needed happened to stop. Left
+        // in the answer unlabelled it reads as "data ends here", which is the
+        // opposite of true: a stale 2024 date next to a current index.
+        const recentSuperseded =
+          Boolean(stats.historyCursorDate && stats.recentCursorDate) &&
+          new Date(stats.historyCursorDate!) >= new Date(stats.recentCursorDate!);
+
+        const coverage = stats.tenders ? stats.enriched / stats.tenders : 0;
+
         return asJsonContent({
           present: true,
-          path: index.path,
+          path: presence.path,
           tenders: stats.tenders,
           buyers: stats.buyers,
           withTitleAndValue: stats.enriched,
-          coverage: stats.tenders
-            ? Number((stats.enriched / stats.tenders).toFixed(3))
-            : 0,
+          coverage: Number(coverage.toFixed(5)),
+          coverageNote:
+            coverage < 0.5
+              ? `Назву, суму і код CPV має ${stats.enriched} процедур із ${stats.tenders}. Пошук за словами, порівняння цін і суми по CPV бачать лише цю частину: решта індексу має тільки службові поля зі стрічки. Суми з proyav_aggregate_spend за таких умов є нижньою межею, а не повною цифрою, і людині треба казати саме так.`
+              : undefined,
           period: { oldest: stats.oldest, newest: stats.newest },
           progress: {
             history: stats.historyCursorDate,
-            recent: stats.recentCursorDate,
+            ...(recentSuperseded ? {} : { recent: stats.recentCursorDate }),
+            note: recentSuperseded
+              ? "Зворотний прохід більше не використовується: основний обхід уже покрив цей період."
+              : undefined,
           },
           updatedAt: stats.updatedAt,
         });

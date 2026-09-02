@@ -1,0 +1,61 @@
+{
+  "name": "@proyav/edr",
+  "version": "0.1.1",
+  "description": "MCP-сервер до Єдиного державного реєстру юросіб (ЄДР): засновники, керівники, бенефіціари, спільні особи між компаніями",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepare": "tsc",
+    "test": "npm run build && node --test test/*.test.ts",
+    "import": "npm run build && node dist/cli.js import",
+    "index:stats": "node dist/cli.js stats",
+    "serve": "npm run build && node dist/serve.js",
+    "smoke:http": "npm run build && node scripts/smoke-http.mjs",
+    "prepublishOnly": "npm run build && npm test",
+    "test:contract": "npm run build && node --test test/live/*.test.ts"
+  },
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "typescript": "^7.0.2"
+  },
+  "bin": {
+    "edr": "dist/index.js",
+    "proyav-edr": "dist/index.js",
+    "proyav-edr-serve": "dist/serve.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LEGAL.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/menacerakuzan/mcpoda.git",
+    "directory": "servers/edr"
+  },
+  "homepage": "https://github.com/menacerakuzan/mcpoda/tree/main/servers/edr#readme",
+  "bugs": {
+    "url": "https://github.com/menacerakuzan/mcpoda/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ukraine",
+    "open-data",
+    "edr"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

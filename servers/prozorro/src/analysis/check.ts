@@ -1,9 +1,11 @@
 import type { Tender } from "../sources/cdb.js";
 import { tenderWebUrl } from "../sources/cdb.js";
 import { money } from "../format.js";
+import type { TenderMonitoring } from "../index/queries.js";
 import {
   describeCompetition,
   findSignals,
+  findRegisterSignals,
   type Bidder,
   type Signal,
 } from "./connections.js";
@@ -61,13 +63,73 @@ export type CheckResult = {
     status: string | null;
   }>;
   signals: Signal[];
+  /**
+   * State audit findings on this procedure. Unlike `signals`, these are not
+   * hints: a concluded monitoring is the audit service's own determination.
+   */
+  audit: {
+    checked: boolean;
+    monitorings: TenderMonitoring[];
+    summary: string;
+  };
   /** Why a part of the check could not run. Empty when everything was possible. */
   limitations: string[];
   whatThisIsNot: string;
   url: string | undefined;
 };
 
-export function checkTender(tender: Tender): CheckResult {
+/**
+ * Turns the monitoring records into one sentence, because the distinction that
+ * matters most is easy to lose in a list: a check that found nothing is a
+ * different answer from a check that is still running, and both differ from
+ * never having been checked at all.
+ */
+function summariseAudit(monitorings: TenderMonitoring[]): string {
+  if (monitorings.length === 0) {
+    return "Держаудитслужба цю процедуру не перевіряла — принаймні за даними, що є в індексі. Це не означає, що з нею все гаразд: перевіряють далеко не все.";
+  }
+
+  const withViolation = monitorings.filter((m) => m.violationOccurred === true);
+  const cleared = monitorings.filter((m) => m.violationOccurred === false);
+  const running = monitorings.filter((m) => m.violationOccurred === null);
+
+  const parts: string[] = [];
+  if (withViolation.length) {
+    parts.push(
+      `Держаудитслужба встановила порушення (${withViolation.length} висновк${withViolation.length === 1 ? "ом" : "ами"}). Це не наша оцінка, а рішення органу фінансового контролю.`,
+    );
+  }
+  if (cleared.length) {
+    parts.push(
+      `За ${cleared.length} перевірк${cleared.length === 1 ? "ою" : "ами"} порушень не встановлено.`,
+    );
+  }
+  if (running.length) {
+    parts.push(`${running.length} перевірк${running.length === 1 ? "а триває" : "и тривають"}, висновку ще немає.`);
+  }
+  return parts.join(" ");
+}
+
+/**
+ * Overlaps found in the register of legal entities, supplied by the caller.
+ *
+ * Passed in rather than looked up here so this stays a pure function over the
+ * tender record: the tests can hand it any overlap they like, and a Prozorro
+ * install with no ЄДР index simply passes nothing.
+ */
+export type RegisterOverlap = {
+  a: string;
+  b: string;
+  name: string;
+  roleA: string;
+  roleB: string;
+};
+
+export function checkTender(
+  tender: Tender,
+  registerOverlaps: RegisterOverlap[] = [],
+  monitorings: TenderMonitoring[] = [],
+): CheckResult {
   const method = tender.procurementMethodType ?? null;
   const status = tender.status ?? null;
   const limitations: string[] = [];
@@ -119,10 +181,21 @@ export function checkTender(tender: Tender): CheckResult {
       submittedAt: b.submittedAt,
       status: b.status,
     })),
-    signals: canCompare ? findSignals(bidders) : [],
+    signals: canCompare
+      ? [...findSignals(bidders), ...findRegisterSignals(bidders, registerOverlaps)]
+      : [],
+    audit: {
+      checked: monitorings.length > 0,
+      monitorings,
+      summary: summariseAudit(monitorings),
+    },
     limitations,
     whatThisIsNot:
-      "Це не висновок про порушення. Кожен знайдений збіг має буденне пояснення, яке наведено поруч. Перевірка показує, куди подивитись людині, і нічого більше.",
+      "У цій відповіді дві різні за вагою частини, і плутати їх не можна. " +
+      "Збіги в signals — це не висновок про порушення: кожен має буденне пояснення, наведене поруч, і показує лише, куди подивитись людині. " +
+      "Розділ audit — інше: там рішення Держаудитслужби, органу, уповноваженого встановлювати порушення. " +
+      "Якщо там violationOccurred=true, це факт, на який можна посилатись; якщо false — перевірка була і порушень не знайшла. " +
+      "Не переносьте вагу висновку ДАСУ на власні здогадки і не подавайте збіг як висновок.",
     url: tender.tenderID ? tenderWebUrl(tender.tenderID) : undefined,
   };
 }

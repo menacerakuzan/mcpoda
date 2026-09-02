@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { catchUp, crawl } from "./index/crawl.js";
 import { enrich } from "./index/enrich.js";
-import { databasePath, indexStats, openDatabase } from "./index/db.js";
+import { crawlMonitorings, detailMonitorings } from "./index/audit.js";
+import { databasePath, indexStats, openDatabase, recordCounts } from "./index/db.js";
 import { SourceError } from "./http.js";
 
 /** Operator commands. The MCP server itself never crawls: it only reads. */
@@ -13,6 +14,23 @@ const flag = (name: string) => {
 };
 
 const db = openDatabase();
+
+/**
+ * Keeps the process alive for the whole of a long command.
+ *
+ * A backfill exited by itself after three hundred thousand records with only
+ * Node's «Detected unsettled top-level await» to show for it. Nothing threw:
+ * the event loop simply ran dry while a request was still in flight, because
+ * `AbortSignal.timeout` does not hold the loop open, and a pass that spends
+ * most of its time waiting on the network can reach a moment where no handle
+ * is ref'd at all. A ref'd interval removes that whole failure mode — the
+ * process now ends when the work ends, and not before.
+ */
+const keepAlive = setInterval(() => {}, 60_000);
+const done = () => {
+  clearInterval(keepAlive);
+  db.close();
+};
 
 if (command === "crawl") {
   const maxPages = Number(flag("pages") ?? 0);
@@ -64,7 +82,7 @@ if (command === "crawl") {
 
       if (!(error instanceof SourceError)) {
         console.error(`помилка: ${error instanceof Error ? error.message : error}`);
-        db.close();
+        done();
         process.exit(1);
       }
 
@@ -81,6 +99,11 @@ if (command === "crawl") {
   console.error(
     `готово: ${progress.entries} записів, ${progress.inserted} нових, ${progress.updated} оновлених`,
   );
+
+  // The counts are what proyav_index_status reads; measuring them here costs
+  // one pass at the end of a job that already took hours, and saves every
+  // later request from paying for it.
+  recordCounts(db);
 } else if (command === "update") {
   // What a scheduled job runs: read whatever changed since the last pass, then
   // fill in titles for the newest procedures that still lack them.
@@ -104,6 +127,11 @@ if (command === "crawl") {
   console.error(
     `готово за ${Math.round((Date.now() - started) / 1000)} с: ${crawled.inserted} нових, ${crawled.updated} оновлених, ${enriched.updated} збагачених`,
   );
+
+  // The counts are what proyav_index_status reads; measuring them here costs
+  // one pass at the end of a job that already took hours, and saves every
+  // later request from paying for it.
+  recordCounts(db);
 } else if (command === "enrich") {
   const limit = Number(flag("limit") ?? 500);
   const started = Date.now();
@@ -125,14 +153,51 @@ if (command === "crawl") {
   console.error(
     `готово: оновлено ${progress.updated}, не вдалося ${progress.failed}`,
   );
+
+  // The counts are what proyav_index_status reads; measuring them here costs
+  // one pass at the end of a job that already took hours, and saves every
+  // later request from paying for it.
+  recordCounts(db);
+} else if (command === "audit") {
+  // Both passes in one command: there are tens of thousands of monitorings,
+  // not millions, so there is no reason to make anyone run two.
+  const started = Date.now();
+  const detailLimit = Number(flag("detail") ?? 5000);
+
+  console.error("стрічка моніторингів Держаудитслужби");
+  const crawled = await crawlMonitorings(db, {
+    maxPages: Number(flag("pages") ?? 0),
+    onProgress: (p) => {
+      process.stderr.write(
+        `\rсторінок ${p.pages} · моніторингів ${p.seen} · нових ${p.inserted} · до ${p.cursorDate?.slice(0, 10) ?? "?"}   `,
+      );
+    },
+  });
+  process.stderr.write("\n");
+
+  console.error(`висновки: до ${detailLimit} записів, найновіші першими`);
+  const detailed = await detailMonitorings(db, {
+    limit: detailLimit,
+    onProgress: (p) => {
+      const rate = (p.seen / Math.max((Date.now() - started) / 1000, 0.001)).toFixed(1);
+      process.stderr.write(
+        `\rоброблено ${p.seen}/${detailLimit} · заповнено ${p.detailed} · помилок ${p.failed} · ${rate}/с   `,
+      );
+    },
+  });
+  process.stderr.write("\n");
+
+  console.error(
+    `готово за ${Math.round((Date.now() - started) / 1000)} с: ${crawled.inserted} нових моніторингів, ${detailed.detailed} висновків`,
+  );
 } else if (command === "stats") {
   const stats = indexStats(db);
   console.log(JSON.stringify({ path: databasePath(), ...stats }, null, 2));
 } else {
   console.error(
-    "команди: crawl [--pages=N] [--from=РРРР-ММ-ДД] [--recent] | update [--enrich=N] | enrich [--limit=N] [--concurrency=N] | stats",
+    "команди: crawl [--pages=N] [--from=РРРР-ММ-ДД] [--recent] | update [--enrich=N] | enrich [--limit=N] [--concurrency=N] | audit [--pages=N] [--detail=N] | stats",
   );
   process.exit(1);
 }
 
-db.close();
+done();

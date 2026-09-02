@@ -22,6 +22,13 @@ function timeoutError() {
   return error;
 }
 
+/** What Node/undici throws for DNS blips, connection resets, and similar. */
+function networkFailure() {
+  const error = new TypeError("fetch failed");
+  (error as TypeError & { cause?: unknown }).cause = new Error("ECONNRESET");
+  return error;
+}
+
 describe("requestJson", () => {
   it("зрештою повертає дані після кількох таймаутів поспіль", async () => {
     let calls = 0;
@@ -53,6 +60,36 @@ describe("requestJson", () => {
       },
     );
     assert.equal(calls, 4, "мало бути 1 початкова спроба + 3 повтори");
+  });
+
+  it("повторює на мережевий збій (fetch failed), а не валиться одразу", async () => {
+    // This is the backfill's 17:57 crash: a plain TypeError from undici with
+    // no SourceError to catch it, so the outer crawl loop had nothing to
+    // retry and the whole process just died.
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      if (calls < 3) throw networkFailure();
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }) as typeof fetch;
+
+    const result = await requestJson<{ ok: boolean }>("https://example.test/x");
+    assert.deepEqual(result, { ok: true });
+    assert.equal(calls, 3);
+  });
+
+  it("здається після вичерпання спроб на мережевий збій і кидає SourceError", async () => {
+    globalThis.fetch = (async () => {
+      throw networkFailure();
+    }) as typeof fetch;
+
+    await assert.rejects(
+      () => requestJson("https://example.test/x"),
+      (error: unknown) => {
+        assert.ok(error instanceof SourceError, "помилка не SourceError");
+        return true;
+      },
+    );
   });
 
   it("повторює на 503, як і раніше", async () => {

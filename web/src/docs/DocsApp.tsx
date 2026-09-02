@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, Database, Layers, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Database, Layers, ShieldCheck } from "lucide-react";
 import { CodeBlock } from "../components/CodeBlock";
 import { LiquidMetalButton } from "../components/LiquidMetalButton";
 import { Mark } from "../components/Mark";
@@ -88,23 +88,24 @@ export default function DocsApp() {
       {/* intro */}
       <div className="border-b border-line">
         <div className="mx-auto max-w-[1240px] px-5 py-16 sm:px-8 sm:py-20">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 font-mono text-[11.5px] tracking-wide text-amber-200">
-            <AlertTriangle className="size-3.5" strokeWidth={2} />
-            ДВА СЕРВЕРИ ПРАЦЮЮТЬ, ПАКЕТИ ЩЕ НЕ В NPM
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 font-mono text-[11.5px] tracking-wide text-emerald-200">
+            <ShieldCheck className="size-3.5" strokeWidth={2} />
+            ТРИ СЕРВЕРИ ПРАЦЮЮТЬ, ПАКЕТИ ОПУБЛІКОВАНІ В NPM
           </div>
 
           <h1 className="max-w-[20ch] font-display text-[clamp(30px,4.6vw,54px)] leading-[1.06] font-medium tracking-[-0.04em]">
             MCP-сервери <span className="text-accent-soft">ПРОЯВ</span>
           </h1>
           <p className="mt-6 max-w-[68ch] text-[17px] leading-relaxed text-[#c6cad0]">
-            Два сервери відкривають AI-асистенту доступ до Prozorro і до Єдиного державного
-            реєстру декларацій. Один конфіг, жодних ключів API і жодної реєстрації: дані вже
-            публічні, ми лише робимо їх придатними для роботи асистента.
+            Три сервери відкривають AI-асистенту доступ до Prozorro, до Єдиного державного
+            реєстру декларацій НАЗК і до реєстру юридичних осіб ЄДР. Один конфіг, жодних ключів
+            API і жодної реєстрації: дані вже публічні, ми лише робимо їх придатними для роботи
+            асистента.
           </p>
 
           <dl className="mt-12 grid gap-8 border-t border-line pt-8 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              ["СЕРВЕРИ", "Prozorro і НАЗК"],
+              ["СЕРВЕРИ", "Prozorro, НАЗК, ЄДР"],
               ["АВТОРИЗАЦІЯ", "не потрібна"],
               ["TOOLS", `${WORKING_COUNT} працюють`],
               ["ДАНІ", "з 2015 року"],
@@ -199,6 +200,10 @@ export default function DocsApp() {
     "proyav-nazk": {
       "command": "npx",
       "args": ["-y", "@proyav/nazk"]
+    },
+    "proyav-edr": {
+      "command": "npx",
+      "args": ["-y", "@proyav/edr"]
     }
   }
 }`,
@@ -217,7 +222,8 @@ export default function DocsApp() {
               ]}
             />
             <p className="mt-4 font-mono text-[12px] text-dim">
-              Пакети та URL наведені як приклад майбутньої публікації.
+              Пакети npx вище реальні й опубліковані. URL для Streamable HTTP — приклад: постійний
+              публічний домен ще не підключено, сервери поки що доступні лише через npx.
             </p>
           </section>
 
@@ -451,13 +457,14 @@ const result = await streamText({
                     {
                       id: "s1",
                       label: "потік викликів",
-                      code: `1. proyav_get_tender(tenderId)            → предмет, очікувана вартість, CPV
-2. proyav_price_benchmark(tenderId)       → медіана і розкид схожих закупівель
-3. proyav_list_tender_bids(tenderId)      → скільки учасників, який крок зниження
-4. proyav_get_supplier_profile(edrpou)    → історія перемог у цього замовника
+                      code: `1. proyav_get_tender(id)                  → предмет, позиції, очікувана вартість, CPV
+2. proyav_price_benchmark(tenderID)       → медіана і розкид схожих закупівель
+3. proyav_check_tender(id)                → скільки учасників і наскільки торги збили ціну
 
    • відхилення від медіани саме по собі не є порушенням
    • один учасник і нульове зниження ціни це привід подивитись уважніше
+   • benchmark відмовляється рахувати, коли схожих менше восьми
+     або коли одиниці виміру різні — і так і каже
    • висновок робить людина, tool лише показує цифри`,
                     },
                   ]}
@@ -474,13 +481,14 @@ const result = await streamText({
                     {
                       id: "s2",
                       label: "потік викликів",
-                      code: `1. proyav_list_tender_bids(tenderId)      → перелік учасників з кодами ЄДРПОУ
-2. proyav_find_connections(edrpou[])      → спільні засновники, керівники, адреси
-3. proyav_list_entity_officers(edrpou)    → дати призначень і змін
-4. proyav_search_declarations(ПІБ)        → чи декларував посадовець ці права
+                      code: `1. proyav_check_tender(id)                → учасники, переможець і збіги між ними:
+                                            телефон, пошта, адреса, час подання
+2. proyav_edr_company(edrpou)             → засновники, керівники, бенефіціари учасника
+3. proyav_edr_shared_people(a, b)         → спільні особи між двома учасниками
 
    • збіг адреси може означати бізнес-центр, а не змову
-   • перевіряйте дати: зв'язок міг існувати до або після торгів`,
+   • збіг у ЄДР це збіг за іменем, не за особою: однофамільці дають той самий результат
+   • кілька слабких сигналів разом не стають доказом — вони лишаються приводом перевірити`,
                     },
                   ]}
                 />
@@ -534,7 +542,7 @@ const result = await streamText({
             <h2 className={H2}>FAQ</h2>
             <div className="mt-8 flex flex-col gap-8">
               {[
-                ["Це офіційний сервіс держави?", "Це проєкт Департаменту цифрового розвитку, інформаційної політики та кіберзахисту Одеської обласної державної адміністрації. Дані беруться з офіційних відкритих джерел, але сервери не є частиною самих реєстрів."],
+                ["Це офіційний сервіс держави?", "Це проєкт Департаменту цифрового розвитку, інформаційної політики та туризму Одеської обласної державної адміністрації. Дані беруться з офіційних відкритих джерел, але сервери не є частиною самих реєстрів."],
                 ["Чому без реєстрації?", "Тому що дані вже відкриті. Реєстрація створювала б бар'єр там, де його немає за законом, і давала б нам знання про те, хто що шукає. Ми цього не хочемо."],
                 ["Чи можна працювати офлайн?", "Так. У stdio-режимі індекс лежить на вашій машині, і після початкового завантаження сервер не потребує мережі, окрім оновлень."],
                 ["Ви зберігаєте мої запити?", "Локальний сервер не надсилає нам нічого. Для HTTP-режиму ми плануємо агрегований лічильник навантаження без тексту запитів."],
@@ -574,7 +582,7 @@ const result = await streamText({
           <div className="flex items-start gap-3">
             <Mark className="mt-0.5 size-5 shrink-0 text-dim" />
             <p className="max-w-[52ch]">
-              Департамент цифрового розвитку, інформаційної політики та кіберзахисту Одеської
+              Департамент цифрового розвитку, інформаційної політики та туризму Одеської
               обласної державної адміністрації
             </p>
           </div>

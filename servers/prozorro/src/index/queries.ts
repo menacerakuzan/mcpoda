@@ -143,18 +143,28 @@ export function searchIndex(
     )
     .get(...params) as { total: number };
 
-  const share = db
-    .prepare(
-      `select count(*) as all_rows,
-              sum(case when enriched_at is not null then 1 else 0 end) as done
-       from tenders`,
-    )
-    .get() as { all_rows: number; done: number | null };
+  const mapped = rows.map(toTender);
 
   return {
-    rows: rows.map(toTender),
+    rows: mapped,
     total,
-    enrichedShare: share.all_rows ? (share.done ?? 0) / share.all_rows : 0,
+    // Coverage of *this answer*, not of the whole index.
+    //
+    // This used to be a count over all thirty million rows, run on every
+    // single search — which made the tool unusable in production: seconds on a
+    // laptop where the file is cached, minutes on the server where eight
+    // gigabytes do not fit in memory. It was found when a real question about
+    // one buyer's procurements simply never came back.
+    //
+    // Caching it would only move the stall around, the same way it did when
+    // /health tried a TTL. The whole-index figure is not what a person needs
+    // here anyway: what matters is how much of the rows they were just handed
+    // carry a title and an amount. That is free to compute, and it is the
+    // honest answer to "how complete is this". The index-wide number stays in
+    // proyav_index_status, whose whole job is to be slow and thorough.
+    enrichedShare: mapped.length
+      ? mapped.filter((row) => row.title !== null).length / mapped.length
+      : 0,
   };
 }
 
@@ -168,6 +178,53 @@ function quote(value: string) {
 }
 
 /** The next procedures worth fetching in full, newest first. */
+export type TenderMonitoring = {
+  monitoringId: string | null;
+  status: string | null;
+  reasons: string[];
+  violationOccurred: boolean | null;
+  violationType: string[];
+  description: string | null;
+  startedAt: string | null;
+};
+
+/**
+ * Every Держаудитслужба check recorded against one procedure.
+ *
+ * Unlike the connection signals, this is not a hint: a concluded monitoring is
+ * the audit service's own finding, and `violationOccurred: false` is as much a
+ * result as `true` — it means they looked and cleared it.
+ */
+export function monitoringsFor(db: DatabaseSync, tenderUuid: string): TenderMonitoring[] {
+  return (
+    db
+      .prepare(
+        `select monitoring_id, status, reasons, violation_occurred, violation_type,
+                description, started_at
+           from monitorings
+          where tender_id = ?
+          order by started_at desc`,
+      )
+      .all(tenderUuid) as Array<{
+      monitoring_id: string | null;
+      status: string | null;
+      reasons: string | null;
+      violation_occurred: number | null;
+      violation_type: string | null;
+      description: string | null;
+      started_at: number | null;
+    }>
+  ).map((row) => ({
+    monitoringId: row.monitoring_id,
+    status: row.status,
+    reasons: row.reasons ? row.reasons.split(",") : [],
+    violationOccurred: row.violation_occurred === null ? null : row.violation_occurred === 1,
+    violationType: row.violation_type ? row.violation_type.split(",") : [],
+    description: row.description,
+    startedAt: row.started_at ? fromEpoch(row.started_at) : null,
+  }));
+}
+
 export function pendingEnrichment(
   db: DatabaseSync,
   limit: number,

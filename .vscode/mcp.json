@@ -4,7 +4,7 @@
       "type": "stdio",
       "command": "node",
       "args": [
-        "/Users/iladovzenko/.vscode/extensions/vexp.vexp-vscode-2.7.0-darwin-arm64/dist/mcp-server.cjs"
+        "/Users/iladovzenko/.vscode/extensions/vexp.vexp-vscode-3.1.0-darwin-arm64/dist/mcp-server.cjs"
       ],
       "env": {
         "VEXP_WORKSPACE": "/Users/iladovzenko/Desktop/mcp"

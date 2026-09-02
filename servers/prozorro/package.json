@@ -1,6 +1,6 @@
 {
   "name": "@proyav/prozorro",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP-сервер до відкритих даних Prozorro: пошук закупівель, картка процедури, стрічка змін",
   "scripts": {
     "build": "tsc",
@@ -27,6 +27,7 @@
     "typescript": "^7.0.2"
   },
   "bin": {
+    "prozorro": "dist/index.js",
     "proyav-prozorro": "dist/index.js",
     "proyav-prozorro-serve": "dist/serve.js"
   },

@@ -354,9 +354,35 @@ describe("searchIndex", () => {
     assert.equal(searchIndex(db, { region: "Одеськ", maxValue: 100000 }).total, 0);
   });
 
-  it("повідомляє, яка частка індексу має назву й суму", () => {
+  it("повідомляє, яка частка знайденого має назву й суму", () => {
     const result = searchIndex(db, {});
     assert.equal(result.enrichedShare, 1);
+  });
+
+  it("рахує покриття по виданих рядках, а не скануючи всю таблицю", () => {
+    // This number used to be a count over every row in the index, run on each
+    // search. On the real 30M-row index that is minutes, and it made the tool
+    // time out in production. It must stay a property of the answer: rows the
+    // caller was handed, all of which here have titles, even though most of
+    // the table does not.
+    for (let i = 100; i < 140; i++) {
+      db.prepare(
+        "insert into tenders (id, tender_id, modified, status) values (?, ?, ?, 'complete')",
+      ).run(`bare-${i}`, `UA-BARE-${i}`, 1);
+    }
+
+    const result = searchIndex(db, { text: "дорога" });
+
+    assert.ok(result.rows.length > 0, "нічого не знайшлось, перевірка беззмістовна");
+    assert.ok(
+      result.rows.every((row) => row.title !== null),
+      "у видачі є рядки без назви, тест перевіряє не те",
+    );
+    assert.equal(
+      result.enrichedShare,
+      1,
+      "покриття порахувалось по всій таблиці, а не по виданих рядках",
+    );
   });
 
   it("не ламається на лапках і апострофах у запиті", () => {
@@ -385,6 +411,46 @@ describe("enrich", () => {
     assert.deepEqual(seen, ["id-2", "id-1"], "збагачення повернулось до вже обробленої");
 
     assert.equal(pendingEnrichment(db, 10).length, 0);
+  });
+
+  it("проходить далі за один батч, коли просять більше, ніж вміщує батч", async () => {
+    // The queue used to be read in a single `select ... limit N`, so a
+    // backfill of four million rows materialised all of them before the first
+    // request went out. Now it reads a batch at a time — which only works if
+    // the pass actually asks for the next batch after draining one.
+    const { fetchPage } = fakeFeed([
+      Array.from({ length: 10 }, (_, i) => entry(i + 1, { id: `id-${i + 1}` })),
+    ]);
+    await crawl(db, { fetchPage, delayMs: 0, pageSize: 10 });
+
+    const fetch = (async (id: string) => ({
+      id,
+      title: "Назва",
+      value: { amount: 1 },
+      items: [],
+    })) as never;
+
+    const progress = await enrich(db, { limit: 10, batchSize: 3, delayMs: 0, fetch });
+
+    assert.equal(progress.updated, 10, "прохід зупинився на першому батчі");
+    assert.equal(pendingEnrichment(db, 20).length, 0, "лишились незбагачені процедури");
+  });
+
+  it("зупиняється, коли збагачувати більше нічого, а не крутиться порожньою", async () => {
+    const { fetchPage } = fakeFeed([[entry(1), entry(2)]]);
+    await crawl(db, { fetchPage, delayMs: 0, pageSize: 2 });
+
+    let calls = 0;
+    const fetch = (async (id: string) => {
+      calls++;
+      return { id, title: "Назва", value: { amount: 1 }, items: [] };
+    }) as never;
+
+    // Asks for far more than exists: must stop at what there is.
+    const progress = await enrich(db, { limit: 1000, batchSize: 2, delayMs: 0, fetch });
+
+    assert.equal(progress.updated, 2);
+    assert.equal(calls, 2, "прохід продовжував питати джерело, коли черга вичерпалась");
   });
 
   it("не перевищує заданої паралельності", async () => {

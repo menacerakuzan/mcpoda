@@ -10,6 +10,10 @@ export const CONFIG = `{
     "proyav-nazk": {
       "command": "npx",
       "args": ["-y", "@proyav/nazk"]
+    },
+    "proyav-edr": {
+      "command": "npx",
+      "args": ["-y", "@proyav/edr"]
     }
   }
 }`;

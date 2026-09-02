@@ -38,17 +38,28 @@ export async function requestJson<T>(
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (error) {
-    if (error instanceof Error && error.name === "TimeoutError") {
-      // Found the hard way: an unbounded overnight crawl died after twelve
-      // million requests on a single timeout, because this branch threw
-      // immediately instead of going through the same retry path as a 503.
-      // A multi-hour job has to treat "no response yet" as exactly the kind
-      // of transient failure retries exist for.
+    // Two different failure shapes both land here and both need the same
+    // treatment for a job meant to run unattended for hours: TimeoutError
+    // (found the hard way — a crawl died after twelve million requests on
+    // one slow response) and the plain `TypeError: fetch failed` Node/undici
+    // throws for DNS blips, connection resets and similar network hiccups
+    // (found the same way, a second time: a backfill died silently at
+    // 17:57 on exactly this, because it wasn't covered and there was no
+    // SourceError for the outer crawl loop to catch and retry). Anything
+    // that isn't one of these two known-transient shapes is rethrown as-is.
+    const isTimeout = error instanceof Error && error.name === "TimeoutError";
+    const isNetworkFailure =
+      error instanceof TypeError && error.message === "fetch failed";
+
+    if (isTimeout || isNetworkFailure) {
       if (attempt < 3) {
         await sleep(400 * 2 ** attempt);
         return requestJson<T>(url, init, attempt + 1);
       }
-      throw new SourceError(408, url, `Джерело не відповіло за ${TIMEOUT_MS} мс`);
+      const reason = isTimeout
+        ? `Джерело не відповіло за ${TIMEOUT_MS} мс`
+        : `Мережева помилка: ${(error as Error & { cause?: unknown }).cause ?? error.message}`;
+      throw new SourceError(isTimeout ? 408 : 0, url, reason);
     }
     throw error;
   }
